@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GeoQuest — TEST BUILD</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Courier+Prime:wght@400;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+
+<style>
+/* Your original CSS stays untouched */
+html, body { margin:0; padding:0; height:100%; overflow:hidden; }
+.screen { position:absolute; inset:0; display:none; }
+.screen.show { display:flex; }
+#game { background:#000; }
+#map-leaf { width:100%; height:100%; }
+#photo-img { width:100%; height:100%; object-fit:cover; }
+</style>
+</head>
+
+<body>
+
+<!-- SPLASH -->
+<div id="splash" class="screen show">
+  <button onclick="startGame()">Start</button>
+</div>
+
+<!-- GAME -->
+<div id="game" class="screen">
+  <img id="photo-img">
+  <div id="map-leaf"></div>
+  <button onclick="submitGuess()" style="position:absolute;bottom:20px;right:20px;z-index:10;">Guess</button>
+</div>
+
+<!-- RESULT -->
+<div id="result" class="screen">
+  <div id="result-text"></div>
+  <button onclick="startGame()">Replay</button>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+
+<script>
+// ================= STATE =================
+var STATE = {
+  name:"CN Tower, Toronto",
+  lat:43.6426,
+  lng:-79.3871,
+  wiki:"CN Tower",
+  scoreK:2000
+};
+
+var map, pin;
+var guess = null;
+
+// ================= UTILS =================
+function haversine(a,b,c,d){
+  var R=6371, toRad=x=>x*Math.PI/180;
+  var dLat=toRad(c-a), dLng=toRad(d-b);
+  var x=Math.sin(dLat/2)**2+
+    Math.cos(toRad(a))*Math.cos(toRad(c))*Math.sin(dLng/2)**2;
+  return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));
+}
+
+function score(dist){
+  return Math.round(5000*Math.exp(-dist/STATE.scoreK));
+}
+
+function show(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('show'));
+  document.getElementById(id).classList.add('show');
+}
+
+// ================= GAME =================
+function startGame(){
+  guess=null;
+  show('game');
+  initMap();
+  loadImage();
+}
+
+function initMap(){
+  if(map) map.remove();
+
+  map=L.map('map-leaf').setView([20,0],2);
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+    maxZoom:18
+  }).addTo(map);
+
+  map.on('click',e=>{
+    guess=e.latlng;
+
+    if(pin) pin.remove();
+    pin=L.circleMarker(guess,{
+      radius:8,color:'#fff',fillColor:'#c9a84c',
+      fillOpacity:1
+    }).addTo(map);
+  });
+}
+
+// ================= IMAGE =================
+function loadImage(){
+  var url=
+    "https://en.wikipedia.org/w/api.php?"+
+    "action=query&format=json&origin=*"+
+    "&prop=pageimages&pithumbsize=1200"+
+    "&titles="+encodeURIComponent(STATE.wiki);
+
+  fetch(url)
+    .then(r=>r.json())
+    .then(data=>{
+      var page=Object.values(data.query.pages)[0];
+      if(page.thumbnail){
+        document.getElementById('photo-img').src=page.thumbnail.source;
+      }
+    })
+    .catch(()=>{});
+}
+
+// ================= RESULT =================
+function submitGuess(){
+  if(!guess) return;
+
+  var dist=haversine(
+    guess.lat,guess.lng,
+    STATE.lat,STATE.lng
+  );
+
+  var pts=score(dist);
+
+  document.getElementById('result-text').innerHTML=
+    "Distance: "+Math.round(dist)+" km<br>Score: "+pts;
+
+  show('result');
+}
+</script>
+
+</body>
+</html>

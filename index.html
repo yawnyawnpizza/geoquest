@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>GeoQuest Real 360</title>
+<title>GeoQuest OS</title>
 
 <link rel="stylesheet"
-href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css"/>
 
 <link rel="stylesheet"
 href="https://cdn.jsdelivr.net/npm/@photo-sphere-viewer/core/index.min.css"/>
@@ -17,56 +17,81 @@ html,body{
   height:100%;
   overflow:hidden;
   background:black;
-  font-family:Arial,sans-serif;
+  font-family:monospace;
 }
 
-/* ================= VIEWER ================= */
+/* ================= TERMINAL ================= */
+#menu{
+  position:fixed;
+  inset:0;
+  background:black;
+  color:#00ff88;
+  padding:20px;
+  z-index:20000;
+}
 
+.cursor{
+  display:inline-block;
+  width:10px;
+  background:#00ff88;
+  animation:blink 1s infinite;
+}
+
+@keyframes blink{
+  50%{opacity:0;}
+}
+
+/* ================= VIEW ================= */
 #viewer{
   width:100%;
   height:100%;
-  background:black;
+  filter:blur(10px);
+  transition:filter 1s ease;
+}
+
+/* ================= HUD ================= */
+#hud{
+  position:fixed;
+  top:10px;
+  left:50%;
+  transform:translateX(-50%);
+  z-index:9999;
+  color:white;
+  background:rgba(0,0,0,0.6);
+  padding:10px;
+  border-radius:8px;
 }
 
 /* ================= MAP ================= */
-
 #mapPanel{
   position:fixed;
-  left:0;
   bottom:0;
+  left:0;
   width:100%;
   height:40%;
   background:#111;
-
   transform:translateY(100%);
-  transition:transform .3s ease;
-
+  transition:0.3s;
   z-index:5000;
 }
 
-#mapPanel.open{
-  transform:translateY(0);
-}
+#mapPanel.open{ transform:translateY(0); }
 
-#map{
-  width:100%;
-  height:100%;
-}
+#map{ width:100%; height:100%; }
 
 /* ================= BUTTONS ================= */
-
 button{
   border:none;
+  padding:10px 14px;
   border-radius:8px;
-  padding:12px 16px;
   font-weight:bold;
   cursor:pointer;
 }
 
 #mapBtn{
   position:fixed;
-  left:10px;
   bottom:10px;
+  left:10px;
   z-index:9999;
   background:#c9a84c;
 }
@@ -75,15 +100,48 @@ button{
   position:absolute;
   right:10px;
   bottom:10px;
-  z-index:6000;
   background:white;
+}
+
+#nextBtn{
+  position:fixed;
+  top:10px;
+  right:10px;
+  z-index:9999;
+  display:none;
+}
+
+/* ================= DEV ================= */
+#dev{
+  position:fixed;
+  bottom:60px;
+  left:10px;
+  width:260px;
+  background:rgba(0,0,0,0.8);
+  color:#0f0;
+  font-size:12px;
+  padding:10px;
+  display:none;
+  z-index:15000;
 }
 </style>
 </head>
 
 <body>
 
+<!-- ================= TERMINAL ================= -->
+<div id="menu">
+<div id="terminal"></div>
+</div>
+
+<!-- ================= GAME ================= -->
 <div id="viewer"></div>
+
+<div id="hud">
+Round: <span id="round">0</span>/5 |
+Score: <span id="score">0</span> |
+Hint: <span id="hint">---</span>
+</div>
 
 <div id="mapPanel">
   <div id="map"></div>
@@ -91,6 +149,9 @@ button{
 </div>
 
 <button id="mapBtn">Map</button>
+<button id="nextBtn">Next</button>
+
+<div id="dev"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
 
@@ -98,216 +159,247 @@ button{
 
 import { Viewer } from "https://cdn.jsdelivr.net/npm/@photo-sphere-viewer/core/+esm";
 
-/* ================= WORKING PANORAMAS =================
-   These are verified equirectangular panoramas
-*/
+/* ================= DATA ================= */
 
 const LOCATIONS = [
-
-  {
-    name:"Beach",
-    lat:25.7907,
-    lng:-80.1300,
-
-    pano:
-    "https://photo-sphere-viewer-data.netlify.app/assets/sphere.jpg"
-  },
-
-  {
-    name:"Mountain",
-    lat:46.8523,
-    lng:-121.7603,
-
-    pano:
-    "https://photo-sphere-viewer-data.netlify.app/assets/sphere-test.jpg"
-  },
-
-  {
-    name:"Office",
-    lat:51.5072,
-    lng:-0.1276,
-
-    pano:
-    "https://photo-sphere-viewer-data.netlify.app/assets/sphere-small.jpg"
-  }
-
+  {name:"NYC",lat:40.7128,lng:-74.0060,pano:"https://photo-sphere-viewer-data.netlify.app/assets/sphere.jpg",hint:"North America"},
+  {name:"Paris",lat:48.8566,lng:2.3522,pano:"https://photo-sphere-viewer-data.netlify.app/assets/sphere-test.jpg",hint:"Europe"},
+  {name:"Tokyo",lat:35.6762,lng:139.6503,pano:"https://photo-sphere-viewer-data.netlify.app/assets/sphere-small.jpg",hint:"Asia"}
 ];
 
-let current;
-let viewer;
-let map;
-let pin = null;
-let guessPos = null;
+let viewer,map,pin;
+let current,guessPos;
 
-/* ================= PANORAMA ================= */
+let round=0,score=0;
+let settings={timeLimit:5,difficulty:2,admin:false};
 
-function loadPanorama(image){
+/* ================= TERMINAL ================= */
 
-  const container =
-    document.getElementById("viewer");
+const terminal=document.getElementById("terminal");
+let text="",input="";
 
-  /* 🔥 FULL RESET FIX */
-  container.innerHTML = "";
+const lines=[
+"GeoQuest OS booting...",
+"loading world engine... OK",
+"",
+"timeLimit = <min>",
+"difficulty = <1-3>",
+"start()",
+"cheats()",
+"admin()",
+"help",
+""
+];
 
-  viewer = new Viewer({
+let i=0;
 
-    container: container,
+function boot(){
+  if(i<lines.length){
+    text+=lines[i]+"\n";
+    terminal.innerHTML=text+"<span class='cursor'></span>";
+    i++;
+    setTimeout(boot,250);
+  } else {
+    terminal.innerHTML=text+"> <span id='input'></span><span class='cursor'></span>";
+  }
+}
 
-    panorama: image,
+/* ================= INPUT ================= */
 
-    navbar: [
-      "zoom",
-      "fullscreen"
-    ],
+document.addEventListener("keydown",(e)=>{
 
-    mousewheel: true,
+  if(i<lines.length) return;
 
-    loadingImg: null
-  });
+  const inputEl=document.getElementById("input");
+  if(!inputEl) return;
+
+  if(e.key==="Backspace") input=input.slice(0,-1);
+  else if(e.key==="Enter"){ execute(input); input=""; }
+  else if(e.key.length===1) input+=e.key;
+
+  inputEl.innerText=input;
+});
+
+/* ================= COMMAND ENGINE ================= */
+
+function log(msg){
+  text+="> "+msg+"\n";
+  terminal.innerHTML=text+"> "+input+"<span class='cursor'></span>";
+}
+
+function execute(cmd){
+
+  cmd=cmd.trim().replace(/\s*=\s*/g,"=");
+
+  /* ================= HELP ================= */
+  if(cmd==="help"){
+    log("timeLimit = x");
+    log("difficulty = x");
+    log("start()");
+    log("cheats()");
+    log("admin()");
+    return;
+  }
+
+  /* ================= CHEATS ================= */
+  if(cmd==="cheats()"){
+    log("godmode");
+    log("reveal()");
+    log("skip()");
+    log("addscore 9999");
+    return;
+  }
+
+  /* ================= ADMIN MODE ================= */
+  if(cmd==="admin()"){
+    settings.admin=true;
+    log("ADMIN MODE ENABLED");
+    log("unlocked hidden commands");
+    return;
+  }
+
+  if(cmd==="godmode" && settings.admin){
+    settings.godmode=true;
+    log("godmode ON");
+    return;
+  }
+
+  if(cmd==="reveal()" && settings.admin){
+    log("map hints always ON");
+    return;
+  }
+
+  if(cmd==="skip()" && settings.admin){
+    log("skipping round");
+    nextRound();
+    return;
+  }
+
+  if(cmd==="addscore 9999"){
+    score+=9999;
+    document.getElementById("score").innerText=score;
+    log("score boosted");
+    return;
+  }
+
+  /* ================= VARIABLES ================= */
+  if(cmd.includes("=")){
+    let [k,v]=cmd.split("=");
+    v=eval(v);
+
+    if(k==="timeLimit") settings.timeLimit=v;
+    if(k==="difficulty") settings.difficulty=v;
+
+    log(k+" = "+v);
+    return;
+  }
+
+  /* ================= START ================= */
+  if(cmd==="start()"||cmd==="start"){
+    document.getElementById("menu").style.display="none";
+    initMap();
+    nextRound();
+    return;
+  }
+
+  log("unknown command");
+}
+
+/* ================= GAME ================= */
+
+function loadPanorama(img){
+  document.getElementById("viewer").innerHTML="";
+  viewer=new Viewer({container:viewer=document.getElementById("viewer"),panorama:img});
+  document.getElementById("viewer").style.filter="blur(0px)";
 }
 
 /* ================= MAP ================= */
 
 function initMap(){
-
-  map = L.map("map",{
-    attributionControl:false
-  });
-
-  L.tileLayer(
-    "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-    {
-      maxZoom:19
-    }
-  ).addTo(map);
-
+  map=L.map("map",{attributionControl:false});
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19}).addTo(map);
   map.setView([20,0],2);
 
   map.on("click",e=>{
-
-    guessPos = e.latlng;
-
-    if(pin){
-      pin.remove();
-    }
-
-    pin = L.circleMarker(
-      guessPos,
-      {
-        radius:8,
-        color:"#fff",
-        fillColor:"#c9a84c",
-        fillOpacity:1
-      }
-    ).addTo(map);
+    guessPos=e.latlng;
+    if(pin)pin.remove();
+    pin=L.circleMarker(guessPos,{radius:8,color:"#fff",fillColor:"#c9a84c",fillOpacity:1}).addTo(map);
   });
 }
 
 /* ================= ROUND ================= */
 
-function loadRound(){
+function nextRound(){
 
-  current =
-    LOCATIONS[
-      Math.floor(
-        Math.random() *
-        LOCATIONS.length
-      )
-    ];
-
-  guessPos = null;
-
-  if(pin){
-    pin.remove();
-    pin = null;
+  if(round>=5){
+    alert("Final Score: "+score);
+    return;
   }
+
+  round++;
+  document.getElementById("round").innerText=round;
+
+  current=LOCATIONS[Math.floor(Math.random()*LOCATIONS.length)];
+  guessPos=null;
+
+  document.getElementById("hint").innerText="...";
+
+  setTimeout(()=>{
+    document.getElementById("hint").innerText=current.hint;
+  },5000);
 
   loadPanorama(current.pano);
 }
 
-/* ================= MAP TOGGLE ================= */
-
-const mapPanel =
-  document.getElementById("mapPanel");
-
-document
-.getElementById("mapBtn")
-.addEventListener("click",()=>{
-
-  mapPanel.classList.toggle("open");
-
-  setTimeout(()=>{
-    map.invalidateSize();
-  },300);
-});
-
 /* ================= GUESS ================= */
 
-document
-.getElementById("guessBtn")
-.addEventListener("click",()=>{
+document.getElementById("guessBtn").onclick=()=>{
 
-  if(!guessPos){
+  if(!guessPos)return;
 
-    alert("Place a marker first.");
-    return;
-  }
-
-  const dist = haversine(
-    guessPos.lat,
-    guessPos.lng,
-    current.lat,
-    current.lng
+  let d=haversine(
+    guessPos.lat,guessPos.lng,
+    current.lat,current.lng
   );
 
-  alert(
-    current.name +
-    "\nDistance: " +
-    Math.round(dist) +
-    " km"
-  );
+  let s=Math.max(0,Math.round(5000-d*2));
 
-  mapPanel.classList.remove("open");
+  score+=s;
+  document.getElementById("score").innerText=score;
 
-  loadRound();
-});
+  alert(current.name+" +"+s);
 
-/* ================= DISTANCE ================= */
+  document.getElementById("nextBtn").style.display="block";
+};
+
+/* ================= NEXT ================= */
+
+document.getElementById("nextBtn").onclick=()=>{
+  document.getElementById("nextBtn").style.display="none";
+  nextRound();
+};
+
+/* ================= MAP ================= */
+
+document.getElementById("mapBtn").onclick=()=>{
+  document.getElementById("mapPanel").classList.toggle("open");
+  setTimeout(()=>map.invalidateSize(),300);
+};
+
+/* ================= DIST ================= */
 
 function haversine(a,b,c,d){
-
-  const R = 6371;
-
-  const toRad =
-    x => x * Math.PI / 180;
-
-  const dLat =
-    toRad(c-a);
-
-  const dLng =
-    toRad(d-b);
-
-  const s =
-    Math.sin(dLat/2)**2 +
-    Math.cos(toRad(a)) *
-    Math.cos(toRad(c)) *
-    Math.sin(dLng/2)**2;
-
-  return R * 2 *
-    Math.atan2(
-      Math.sqrt(s),
-      Math.sqrt(1-s)
-    );
+  const R=6371,toRad=x=>x*Math.PI/180;
+  const dLat=toRad(c-a);
+  const dLng=toRad(d-b);
+  const s=Math.sin(dLat/2)**2+
+  Math.cos(toRad(a))*Math.cos(toRad(c))*Math.sin(dLng/2)**2;
+  return R*2*Math.atan2(Math.sqrt(s),Math.sqrt(1-s));
 }
 
 /* ================= START ================= */
 
-window.addEventListener("load",()=>{
-
-  initMap();
-  loadRound();
-
-});
+window.addEventListener("load",boot);
 
 </script>
 

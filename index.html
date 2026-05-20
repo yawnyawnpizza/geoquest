@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>GeoQuest Free Street View</title>
+<title>GeoQuest 360</title>
 
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
 
@@ -11,78 +11,288 @@
 html,body{
   margin:0;
   height:100%;
+  overflow:hidden;
+  background:black;
+  font-family:Arial, sans-serif;
+}
+
+/* ================= 360 VIEW ================= */
+
+#viewer{
+  position:relative;
+  width:100%;
+  height:100%;
+  overflow:hidden;
+  cursor:grab;
   background:black;
 }
 
-/* TOP "STREET VIEW" IMAGE */
+#viewer:active{
+  cursor:grabbing;
+}
+
 #pano{
-  height:60%;
-  width:100%;
-  background-size:cover;
-  background-position:center;
-  background-repeat:no-repeat;
+  position:absolute;
+  top:0;
+  left:0;
+  height:100%;
+  width:300%;
+  background-repeat:repeat-x;
+  background-size:auto 100%;
+  transform:translateX(0);
 }
 
-/* BOTTOM MAP */
-#map{
+/* ================= MAP PANEL ================= */
+
+#mapPanel{
+  position:fixed;
+  bottom:0;
+  left:0;
+  width:100%;
   height:40%;
-  width:100%;
+  background:#111;
+  transform:translateY(100%);
+  transition:transform 0.3s ease;
+  z-index:5000;
 }
 
-button{
+#mapPanel.open{
+  transform:translateY(0);
+}
+
+#map{
+  width:100%;
+  height:100%;
+}
+
+/* ================= BUTTONS ================= */
+
+#mapBtn{
+  position:fixed;
+  bottom:10px;
+  left:10px;
+  z-index:9999;
+  padding:12px 16px;
+  border:none;
+  border-radius:8px;
+  background:#c9a84c;
+  color:black;
+  font-weight:bold;
+  cursor:pointer;
+}
+
+#guessBtn{
   position:fixed;
   bottom:10px;
   right:10px;
   z-index:9999;
+  padding:12px 16px;
+  border:none;
+  border-radius:8px;
+  background:white;
+  color:black;
+  font-weight:bold;
+  cursor:pointer;
+}
+
+#info{
+  position:fixed;
+  top:10px;
+  left:50%;
+  transform:translateX(-50%);
+  z-index:9999;
+  background:rgba(0,0,0,0.7);
+  color:white;
+  padding:10px 14px;
+  border-radius:8px;
 }
 </style>
 </head>
 
 <body>
 
-<div id="pano"></div>
-<div id="map"></div>
-<button onclick="guess()">Guess</button>
+<div id="viewer">
+  <div id="pano"></div>
+</div>
+
+<div id="info">
+  Drag to look around
+</div>
+
+<div id="mapPanel">
+  <div id="map"></div>
+</div>
+
+<button id="mapBtn">Map</button>
+<button id="guessBtn">Guess</button>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
 
 <script>
 
-/* ================= GAME DATA =================
-   You will add more locations here later
-*/
+/* ================= LOCATIONS ================= */
+
 const LOCATIONS = [
   {
-    name: "CN Tower",
-    lat: 43.6426,
-    lng: -79.3871,
-    image: "https://upload.wikimedia.org/wikipedia/commons/9/9c/CN_Tower_from_Below.jpg"
+    name:"Statue of Liberty",
+    lat:40.6892,
+    lng:-74.0445,
+    image:"https://upload.wikimedia.org/wikipedia/commons/a/a1/Statue_of_Liberty_7.jpg"
   },
   {
-    name: "Eiffel Tower",
-    lat: 48.8584,
-    lng: 2.2945,
-    image: "https://upload.wikimedia.org/wikipedia/commons/a/a8/Tour_Eiffel_Wikimedia_Commons.jpg"
+    name:"CN Tower",
+    lat:43.6426,
+    lng:-79.3871,
+    image:"https://upload.wikimedia.org/wikipedia/commons/9/9c/CN_Tower_from_Below.jpg"
   },
   {
-    name: "Statue of Liberty",
-    lat: 40.6892,
-    lng: -74.0445,
-    image: "https://upload.wikimedia.org/wikipedia/commons/a/a1/Statue_of_Liberty_7.jpg"
+    name:"Eiffel Tower",
+    lat:48.8584,
+    lng:2.2945,
+    image:"https://upload.wikimedia.org/wikipedia/commons/a/a8/Tour_Eiffel_Wikimedia_Commons.jpg"
   }
 ];
 
-let current = null;
+let current;
 let map;
 let guessPos = null;
-let pin;
+let pin = null;
 
-/* ================= LOAD ROUND ================= */
+/* ================= PANORAMA ================= */
+
+const pano = document.getElementById("pano");
+
+let isDragging = false;
+let startX = 0;
+let currentX = 0;
+
+function setupPanorama(image){
+
+  pano.style.backgroundImage =
+    `url(${image}), url(${image}), url(${image})`;
+
+  currentX = -window.innerWidth;
+  updatePan();
+}
+
+function updatePan(){
+  pano.style.transform =
+    `translateX(${currentX}px)`;
+}
+
+document.getElementById("viewer")
+.addEventListener("mousedown",e=>{
+  isDragging = true;
+  startX = e.clientX;
+});
+
+window.addEventListener("mouseup",()=>{
+  isDragging = false;
+});
+
+window.addEventListener("mousemove",e=>{
+
+  if(!isDragging) return;
+
+  const dx = e.clientX - startX;
+  startX = e.clientX;
+
+  currentX += dx;
+
+  const limit = window.innerWidth * 2;
+
+  if(currentX > 0){
+    currentX = -window.innerWidth;
+  }
+
+  if(currentX < -limit){
+    currentX = -window.innerWidth;
+  }
+
+  updatePan();
+});
+
+/* TOUCH SUPPORT */
+
+document.getElementById("viewer")
+.addEventListener("touchstart",e=>{
+  isDragging = true;
+  startX = e.touches[0].clientX;
+});
+
+window.addEventListener("touchend",()=>{
+  isDragging = false;
+});
+
+window.addEventListener("touchmove",e=>{
+
+  if(!isDragging) return;
+
+  const dx = e.touches[0].clientX - startX;
+  startX = e.touches[0].clientX;
+
+  currentX += dx;
+
+  const limit = window.innerWidth * 2;
+
+  if(currentX > 0){
+    currentX = -window.innerWidth;
+  }
+
+  if(currentX < -limit){
+    currentX = -window.innerWidth;
+  }
+
+  updatePan();
+});
+
+/* ================= MAP ================= */
+
+function initMap(){
+
+  map = L.map('map',{
+    zoomControl:true,
+    attributionControl:false
+  });
+
+  L.tileLayer(
+    'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    { maxZoom:19 }
+  ).addTo(map);
+
+  map.setView([20,0],2);
+
+  map.on('click',e=>{
+
+    guessPos = e.latlng;
+
+    if(pin){
+      pin.remove();
+    }
+
+    pin = L.circleMarker(guessPos,{
+      radius:8,
+      color:"#fff",
+      fillColor:"#c9a84c",
+      fillOpacity:1
+    }).addTo(map);
+  });
+
+  setTimeout(()=>{
+    map.invalidateSize();
+  },200);
+}
+
+/* ================= ROUND ================= */
+
 function loadRound(){
-  current = LOCATIONS[Math.floor(Math.random() * LOCATIONS.length)];
 
-  document.getElementById("pano").style.backgroundImage =
-    `url(${current.image})`;
+  current =
+    LOCATIONS[
+      Math.floor(Math.random()*LOCATIONS.length)
+    ];
+
+  setupPanorama(current.image);
 
   guessPos = null;
 
@@ -92,37 +302,30 @@ function loadRound(){
   }
 }
 
-/* ================= MAP ================= */
-function initMap(){
+/* ================= MAP TOGGLE ================= */
 
-  map = L.map('map',{
-    zoomControl:true,
-    attributionControl:false
-  });
+const mapPanel =
+  document.getElementById("mapPanel");
 
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
-    maxZoom:19
-  }).addTo(map);
+document.getElementById("mapBtn")
+.addEventListener("click",()=>{
 
-  map.setView([20,0],2);
+  mapPanel.classList.toggle("open");
 
-  map.on('click',e=>{
-    guessPos = e.latlng;
-
-    if(pin) pin.remove();
-
-    pin = L.circleMarker(guessPos,{
-      radius:8,
-      color:'#fff',
-      fillColor:'#c9a84c',
-      fillOpacity:1
-    }).addTo(map);
-  });
-}
+  setTimeout(()=>{
+    map.invalidateSize();
+  },300);
+});
 
 /* ================= GUESS ================= */
-function guess(){
-  if(!guessPos || !current) return;
+
+document.getElementById("guessBtn")
+.addEventListener("click",()=>{
+
+  if(!guessPos){
+    alert("Place a marker first.");
+    return;
+  }
 
   const dist = haversine(
     guessPos.lat,
@@ -139,31 +342,40 @@ function guess(){
   );
 
   loadRound();
-}
+});
 
 /* ================= DISTANCE ================= */
-function haversine(a,b,c,d){
-  const R = 6371;
-  const toRad = x => x * Math.PI / 180;
 
-  const dLat = toRad(c - a);
-  const dLng = toRad(d - b);
+function haversine(a,b,c,d){
+
+  const R = 6371;
+
+  const toRad =
+    x => x * Math.PI / 180;
+
+  const dLat = toRad(c-a);
+  const dLng = toRad(d-b);
 
   const s =
     Math.sin(dLat/2)**2 +
-    Math.cos(toRad(a))*Math.cos(toRad(c))*
+    Math.cos(toRad(a)) *
+    Math.cos(toRad(c)) *
     Math.sin(dLng/2)**2;
 
-  return R * 2 * Math.atan2(Math.sqrt(s), Math.sqrt(1-s));
+  return R * 2 *
+    Math.atan2(
+      Math.sqrt(s),
+      Math.sqrt(1-s)
+    );
 }
 
 /* ================= START ================= */
-function start(){
+
+window.addEventListener("load",()=>{
+
   initMap();
   loadRound();
-}
-
-window.addEventListener("load", start);
+});
 
 </script>
 

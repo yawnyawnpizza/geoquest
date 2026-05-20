@@ -3,9 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>GeoQuest 360</title>
+<title>GeoQuest Panorama</title>
 
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+<link rel="stylesheet"
+href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+
+<link rel="stylesheet"
+href="https://cdn.jsdelivr.net/npm/photo-sphere-viewer@5/dist/photo-sphere-viewer.min.css"/>
 
 <style>
 html,body{
@@ -13,46 +17,32 @@ html,body{
   height:100%;
   overflow:hidden;
   background:black;
-  font-family:Arial, sans-serif;
+  font-family:Arial,sans-serif;
 }
 
-/* ================= 360 VIEW ================= */
+/* ================= PANORAMA ================= */
 
 #viewer{
-  position:relative;
   width:100%;
   height:100%;
-  overflow:hidden;
-  cursor:grab;
   background:black;
-}
-
-#viewer:active{
-  cursor:grabbing;
-}
-
-#pano{
-  position:absolute;
-  top:0;
-  left:0;
-  height:100%;
-  width:300%;
-  background-repeat:repeat-x;
-  background-size:auto 100%;
-  transform:translateX(0);
 }
 
 /* ================= MAP PANEL ================= */
 
 #mapPanel{
   position:fixed;
-  bottom:0;
   left:0;
+  bottom:0;
+
   width:100%;
   height:40%;
+
   background:#111;
+
   transform:translateY(100%);
-  transition:transform 0.3s ease;
+  transition:transform .3s ease;
+
   z-index:5000;
 }
 
@@ -67,42 +57,55 @@ html,body{
 
 /* ================= BUTTONS ================= */
 
-#mapBtn{
+button{
   position:fixed;
-  bottom:10px;
-  left:10px;
   z-index:9999;
+
   padding:12px 16px;
+
   border:none;
   border-radius:8px;
-  background:#c9a84c;
-  color:black;
+
   font-weight:bold;
   cursor:pointer;
 }
 
-#guessBtn{
-  position:fixed;
+/* OPEN MAP BUTTON */
+#mapBtn{
+  left:10px;
   bottom:10px;
+  background:#c9a84c;
+}
+
+/* 🔥 GUESS BUTTON NOW INSIDE MAP */
+#guessBtn{
   right:10px;
-  z-index:9999;
-  padding:12px 16px;
-  border:none;
-  border-radius:8px;
+  bottom:10px;
+
   background:white;
   color:black;
-  font-weight:bold;
-  cursor:pointer;
 }
 
+/* MAP CONTROLS */
+#mapControls{
+  position:absolute;
+  right:10px;
+  bottom:10px;
+  z-index:6000;
+}
+
+/* INFO */
 #info{
   position:fixed;
   top:10px;
   left:50%;
   transform:translateX(-50%);
+
   z-index:9999;
-  background:rgba(0,0,0,0.7);
+
+  background:rgba(0,0,0,.7);
   color:white;
+
   padding:10px 14px;
   border-radius:8px;
 }
@@ -111,158 +114,111 @@ html,body{
 
 <body>
 
-<div id="viewer">
-  <div id="pano"></div>
-</div>
+<div id="viewer"></div>
 
 <div id="info">
   Drag to look around
 </div>
 
+<!-- MAP PANEL -->
 <div id="mapPanel">
+
   <div id="map"></div>
+
+  <!-- 🔥 BUTTON NOW ON MAP -->
+  <div id="mapControls">
+    <button id="guessBtn">Guess</button>
+  </div>
+
 </div>
 
+<!-- OPEN MAP -->
 <button id="mapBtn">Map</button>
-<button id="guessBtn">Guess</button>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/three/build/three.min.js"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/photo-sphere-viewer@5/dist/photo-sphere-viewer.min.js"></script>
 
 <script>
 
 /* ================= LOCATIONS ================= */
 
 const LOCATIONS = [
+
   {
-    name:"Statue of Liberty",
-    lat:40.6892,
-    lng:-74.0445,
-    image:"https://upload.wikimedia.org/wikipedia/commons/a/a1/Statue_of_Liberty_7.jpg"
+    name:"Beach",
+    lat:25.7907,
+    lng:-80.1300,
+
+    pano:
+    "https://photo-sphere-viewer-data.netlify.app/assets/sphere.jpg"
   },
+
   {
-    name:"CN Tower",
-    lat:43.6426,
-    lng:-79.3871,
-    image:"https://upload.wikimedia.org/wikipedia/commons/9/9c/CN_Tower_from_Below.jpg"
-  },
-  {
-    name:"Eiffel Tower",
-    lat:48.8584,
-    lng:2.2945,
-    image:"https://upload.wikimedia.org/wikipedia/commons/a/a8/Tour_Eiffel_Wikimedia_Commons.jpg"
+    name:"Mountain",
+    lat:46.8523,
+    lng:-121.7603,
+
+    pano:
+    "https://photo-sphere-viewer-data.netlify.app/assets/sphere-test.jpg"
   }
+
 ];
 
 let current;
+let viewer;
 let map;
-let guessPos = null;
 let pin = null;
+let guessPos = null;
 
 /* ================= PANORAMA ================= */
 
-const pano = document.getElementById("pano");
+function initViewer(image){
 
-let isDragging = false;
-let startX = 0;
-let currentX = 0;
+  if(viewer){
+    viewer.destroy();
+  }
 
-function setupPanorama(image){
+  viewer = new PhotoSphereViewer.Viewer({
 
-  pano.style.backgroundImage =
-    `url(${image}), url(${image}), url(${image})`;
+    container:
+      document.querySelector("#viewer"),
 
-  currentX = -window.innerWidth;
-  updatePan();
+    panorama:image,
+
+    navbar:[
+      "zoom",
+      "fullscreen"
+    ],
+
+    mousewheel:true,
+
+    defaultYaw:"0deg",
+
+    touchmoveTwoFingers:false
+  });
 }
-
-function updatePan(){
-  pano.style.transform =
-    `translateX(${currentX}px)`;
-}
-
-document.getElementById("viewer")
-.addEventListener("mousedown",e=>{
-  isDragging = true;
-  startX = e.clientX;
-});
-
-window.addEventListener("mouseup",()=>{
-  isDragging = false;
-});
-
-window.addEventListener("mousemove",e=>{
-
-  if(!isDragging) return;
-
-  const dx = e.clientX - startX;
-  startX = e.clientX;
-
-  currentX += dx;
-
-  const limit = window.innerWidth * 2;
-
-  if(currentX > 0){
-    currentX = -window.innerWidth;
-  }
-
-  if(currentX < -limit){
-    currentX = -window.innerWidth;
-  }
-
-  updatePan();
-});
-
-/* TOUCH SUPPORT */
-
-document.getElementById("viewer")
-.addEventListener("touchstart",e=>{
-  isDragging = true;
-  startX = e.touches[0].clientX;
-});
-
-window.addEventListener("touchend",()=>{
-  isDragging = false;
-});
-
-window.addEventListener("touchmove",e=>{
-
-  if(!isDragging) return;
-
-  const dx = e.touches[0].clientX - startX;
-  startX = e.touches[0].clientX;
-
-  currentX += dx;
-
-  const limit = window.innerWidth * 2;
-
-  if(currentX > 0){
-    currentX = -window.innerWidth;
-  }
-
-  if(currentX < -limit){
-    currentX = -window.innerWidth;
-  }
-
-  updatePan();
-});
 
 /* ================= MAP ================= */
 
 function initMap(){
 
-  map = L.map('map',{
-    zoomControl:true,
+  map = L.map("map",{
     attributionControl:false
   });
 
   L.tileLayer(
-    'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-    { maxZoom:19 }
+    "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+    {
+      maxZoom:19
+    }
   ).addTo(map);
 
   map.setView([20,0],2);
 
-  map.on('click',e=>{
+  map.on("click",e=>{
 
     guessPos = e.latlng;
 
@@ -270,17 +226,16 @@ function initMap(){
       pin.remove();
     }
 
-    pin = L.circleMarker(guessPos,{
-      radius:8,
-      color:"#fff",
-      fillColor:"#c9a84c",
-      fillOpacity:1
-    }).addTo(map);
+    pin = L.circleMarker(
+      guessPos,
+      {
+        radius:8,
+        color:"#fff",
+        fillColor:"#c9a84c",
+        fillOpacity:1
+      }
+    ).addTo(map);
   });
-
-  setTimeout(()=>{
-    map.invalidateSize();
-  },200);
 }
 
 /* ================= ROUND ================= */
@@ -289,10 +244,13 @@ function loadRound(){
 
   current =
     LOCATIONS[
-      Math.floor(Math.random()*LOCATIONS.length)
+      Math.floor(
+        Math.random() *
+        LOCATIONS.length
+      )
     ];
 
-  setupPanorama(current.image);
+  initViewer(current.pano);
 
   guessPos = null;
 
@@ -307,7 +265,8 @@ function loadRound(){
 const mapPanel =
   document.getElementById("mapPanel");
 
-document.getElementById("mapBtn")
+document
+.getElementById("mapBtn")
 .addEventListener("click",()=>{
 
   mapPanel.classList.toggle("open");
@@ -319,7 +278,8 @@ document.getElementById("mapBtn")
 
 /* ================= GUESS ================= */
 
-document.getElementById("guessBtn")
+document
+.getElementById("guessBtn")
 .addEventListener("click",()=>{
 
   if(!guessPos){
@@ -341,6 +301,9 @@ document.getElementById("guessBtn")
     " km"
   );
 
+  // close map after guess
+  mapPanel.classList.remove("open");
+
   loadRound();
 });
 
@@ -353,8 +316,11 @@ function haversine(a,b,c,d){
   const toRad =
     x => x * Math.PI / 180;
 
-  const dLat = toRad(c-a);
-  const dLng = toRad(d-b);
+  const dLat =
+    toRad(c-a);
+
+  const dLng =
+    toRad(d-b);
 
   const s =
     Math.sin(dLat/2)**2 +

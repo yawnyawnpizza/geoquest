@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GeoQuest Panorama</title>
+
+<link rel="stylesheet"
+href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+
+<link rel="stylesheet"
+href="https://cdn.jsdelivr.net/npm/@photo-sphere-viewer/core/index.min.css"/>
+
+<style>
+html,body{
+  margin:0;
+  height:100%;
+  overflow:hidden;
+  background:black;
+  font-family:Arial,sans-serif;
+}
+
+#viewer{
+  width:100%;
+  height:100%;
+  background:black;
+}
+
+#mapPanel{
+  position:fixed;
+  left:0;
+  bottom:0;
+  width:100%;
+  height:40%;
+  background:#111;
+  transform:translateY(100%);
+  transition:transform .3s ease;
+  z-index:5000;
+}
+
+#mapPanel.open{
+  transform:translateY(0);
+}
+
+#map{
+  width:100%;
+  height:100%;
+}
+
+button{
+  position:fixed;
+  z-index:9999;
+  padding:12px 16px;
+  border:none;
+  border-radius:8px;
+  font-weight:bold;
+  cursor:pointer;
+}
+
+#mapBtn{
+  left:10px;
+  bottom:10px;
+  background:#c9a84c;
+}
+
+#mapControls{
+  position:absolute;
+  right:10px;
+  bottom:10px;
+}
+
+#guessBtn{
+  background:white;
+}
+</style>
+</head>
+
+<body>
+
+<div id="viewer"></div>
+
+<div id="mapPanel">
+  <div id="map"></div>
+  <div id="mapControls">
+    <button id="guessBtn">Guess</button>
+  </div>
+</div>
+
+<button id="mapBtn">Map</button>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+
+<script type="module">
+
+import { Viewer } from 'https://cdn.jsdelivr.net/npm/@photo-sphere-viewer/core/+esm';
+
+const LOCATIONS = [
+  {
+    name:"Beach",
+    lat:25.7907,
+    lng:-80.1300,
+    pano:"https://photo-sphere-viewer-data.netlify.app/assets/sphere.jpg"
+  },
+  {
+    name:"Mountain",
+    lat:46.8523,
+    lng:-121.7603,
+    pano:"https://photo-sphere-viewer-data.netlify.app/assets/sphere-test.jpg"
+  },
+  {
+    name:"City",
+    lat:43.6426,
+    lng:-79.3871,
+    pano:"https://photo-sphere-viewer-data.netlify.app/assets/sphere.jpg"
+  }
+];
+
+let current;
+let viewer;
+let map;
+let pin = null;
+let guessPos = null;
+
+/* ================= PANORAMA (FIXED RESET) ================= */
+
+function initViewer(image){
+
+  const container = document.getElementById("viewer");
+
+  // 🔥 HARD RESET (prevents black canvas)
+  container.innerHTML = "";
+
+  requestAnimationFrame(() => {
+
+    viewer = new Viewer({
+      container,
+      panorama: image,
+      navbar: ["zoom", "fullscreen"],
+      mousewheel: true
+    });
+
+  });
+}
+
+/* ================= MAP ================= */
+
+function initMap(){
+
+  map = L.map("map",{
+    attributionControl:false
+  });
+
+  L.tileLayer(
+    "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+    { maxZoom:19 }
+  ).addTo(map);
+
+  map.setView([20,0],2);
+
+  map.on("click",e=>{
+
+    guessPos = e.latlng;
+
+    if(pin) pin.remove();
+
+    pin = L.circleMarker(guessPos,{
+      radius:8,
+      color:"#fff",
+      fillColor:"#c9a84c",
+      fillOpacity:1
+    }).addTo(map);
+  });
+}
+
+/* ================= ROUND ================= */
+
+function loadRound(){
+
+  current =
+    LOCATIONS[
+      Math.floor(Math.random()*LOCATIONS.length)
+    ];
+
+  guessPos = null;
+
+  if(pin){
+    pin.remove();
+    pin = null;
+  }
+
+  initViewer(current.pano);
+}
+
+/* ================= MAP TOGGLE ================= */
+
+const mapPanel = document.getElementById("mapPanel");
+
+document.getElementById("mapBtn").addEventListener("click",()=>{
+
+  mapPanel.classList.toggle("open");
+
+  setTimeout(()=>{
+    map.invalidateSize();
+  },300);
+});
+
+/* ================= GUESS ================= */
+
+document.getElementById("guessBtn").addEventListener("click",()=>{
+
+  if(!guessPos){
+    alert("Place a marker first.");
+    return;
+  }
+
+  const dist = haversine(
+    guessPos.lat,
+    guessPos.lng,
+    current.lat,
+    current.lng
+  );
+
+  alert(current.name + "\nDistance: " + Math.round(dist) + " km");
+
+  mapPanel.classList.remove("open");
+
+  loadRound();
+});
+
+/* ================= DIST ================= */
+
+function haversine(a,b,c,d){
+
+  const R = 6371;
+  const toRad = x => x * Math.PI / 180;
+
+  const dLat = toRad(c-a);
+  const dLng = toRad(d-b);
+
+  const s =
+    Math.sin(dLat/2)**2 +
+    Math.cos(toRad(a))*Math.cos(toRad(c))*
+    Math.sin(dLng/2)**2;
+
+  return R * 2 * Math.atan2(Math.sqrt(s), Math.sqrt(1-s));
+}
+
+/* ================= START ================= */
+
+window.addEventListener("load",()=>{
+
+  initMap();
+  loadRound();
+
+});
+
+</script>
+
+</body>
+</html>

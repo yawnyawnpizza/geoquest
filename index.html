@@ -9,7 +9,7 @@
 href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
 
 <link rel="stylesheet"
-href="https://cdn.jsdelivr.net/npm/photo-sphere-viewer@5/dist/photo-sphere-viewer.min.css"/>
+href="https://cdn.jsdelivr.net/npm/@photo-sphere-viewer/core/index.min.css"/>
 
 <style>
 html,body{
@@ -20,29 +20,21 @@ html,body{
   font-family:Arial,sans-serif;
 }
 
-/* ================= PANORAMA ================= */
-
 #viewer{
   width:100%;
   height:100%;
   background:black;
 }
 
-/* ================= MAP PANEL ================= */
-
 #mapPanel{
   position:fixed;
   left:0;
   bottom:0;
-
   width:100%;
   height:40%;
-
   background:#111;
-
   transform:translateY(100%);
   transition:transform .3s ease;
-
   z-index:5000;
 }
 
@@ -55,59 +47,30 @@ html,body{
   height:100%;
 }
 
-/* ================= BUTTONS ================= */
-
 button{
   position:fixed;
   z-index:9999;
-
   padding:12px 16px;
-
   border:none;
   border-radius:8px;
-
   font-weight:bold;
   cursor:pointer;
 }
 
-/* OPEN MAP BUTTON */
 #mapBtn{
   left:10px;
   bottom:10px;
   background:#c9a84c;
 }
 
-/* 🔥 GUESS BUTTON NOW INSIDE MAP */
-#guessBtn{
-  right:10px;
-  bottom:10px;
-
-  background:white;
-  color:black;
-}
-
-/* MAP CONTROLS */
 #mapControls{
   position:absolute;
   right:10px;
   bottom:10px;
-  z-index:6000;
 }
 
-/* INFO */
-#info{
-  position:fixed;
-  top:10px;
-  left:50%;
-  transform:translateX(-50%);
-
-  z-index:9999;
-
-  background:rgba(0,0,0,.7);
-  color:white;
-
-  padding:10px 14px;
-  border-radius:8px;
+#guessBtn{
+  background:white;
 }
 </style>
 </head>
@@ -116,55 +79,40 @@ button{
 
 <div id="viewer"></div>
 
-<div id="info">
-  Drag to look around
-</div>
-
-<!-- MAP PANEL -->
 <div id="mapPanel">
-
   <div id="map"></div>
-
-  <!-- 🔥 BUTTON NOW ON MAP -->
   <div id="mapControls">
     <button id="guessBtn">Guess</button>
   </div>
-
 </div>
 
-<!-- OPEN MAP -->
 <button id="mapBtn">Map</button>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
 
-<script src="https://cdn.jsdelivr.net/npm/three/build/three.min.js"></script>
+<script type="module">
 
-<script src="https://cdn.jsdelivr.net/npm/photo-sphere-viewer@5/dist/photo-sphere-viewer.min.js"></script>
-
-<script>
-
-/* ================= LOCATIONS ================= */
+import { Viewer } from 'https://cdn.jsdelivr.net/npm/@photo-sphere-viewer/core/+esm';
 
 const LOCATIONS = [
-
   {
     name:"Beach",
     lat:25.7907,
     lng:-80.1300,
-
-    pano:
-    "https://photo-sphere-viewer-data.netlify.app/assets/sphere.jpg"
+    pano:"https://photo-sphere-viewer-data.netlify.app/assets/sphere.jpg"
   },
-
   {
     name:"Mountain",
     lat:46.8523,
     lng:-121.7603,
-
-    pano:
-    "https://photo-sphere-viewer-data.netlify.app/assets/sphere-test.jpg"
+    pano:"https://photo-sphere-viewer-data.netlify.app/assets/sphere-test.jpg"
+  },
+  {
+    name:"City",
+    lat:43.6426,
+    lng:-79.3871,
+    pano:"https://photo-sphere-viewer-data.netlify.app/assets/sphere.jpg"
   }
-
 ];
 
 let current;
@@ -173,31 +121,24 @@ let map;
 let pin = null;
 let guessPos = null;
 
-/* ================= PANORAMA ================= */
+/* ================= PANORAMA (FIXED RESET) ================= */
 
 function initViewer(image){
 
-  if(viewer){
-    viewer.destroy();
-  }
+  const container = document.getElementById("viewer");
 
-  viewer = new PhotoSphereViewer.Viewer({
+  // 🔥 HARD RESET (prevents black canvas)
+  container.innerHTML = "";
 
-    container:
-      document.querySelector("#viewer"),
+  requestAnimationFrame(() => {
 
-    panorama:image,
+    viewer = new Viewer({
+      container,
+      panorama: image,
+      navbar: ["zoom", "fullscreen"],
+      mousewheel: true
+    });
 
-    navbar:[
-      "zoom",
-      "fullscreen"
-    ],
-
-    mousewheel:true,
-
-    defaultYaw:"0deg",
-
-    touchmoveTwoFingers:false
   });
 }
 
@@ -211,9 +152,7 @@ function initMap(){
 
   L.tileLayer(
     "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-    {
-      maxZoom:19
-    }
+    { maxZoom:19 }
   ).addTo(map);
 
   map.setView([20,0],2);
@@ -222,19 +161,14 @@ function initMap(){
 
     guessPos = e.latlng;
 
-    if(pin){
-      pin.remove();
-    }
+    if(pin) pin.remove();
 
-    pin = L.circleMarker(
-      guessPos,
-      {
-        radius:8,
-        color:"#fff",
-        fillColor:"#c9a84c",
-        fillOpacity:1
-      }
-    ).addTo(map);
+    pin = L.circleMarker(guessPos,{
+      radius:8,
+      color:"#fff",
+      fillColor:"#c9a84c",
+      fillOpacity:1
+    }).addTo(map);
   });
 }
 
@@ -244,13 +178,8 @@ function loadRound(){
 
   current =
     LOCATIONS[
-      Math.floor(
-        Math.random() *
-        LOCATIONS.length
-      )
+      Math.floor(Math.random()*LOCATIONS.length)
     ];
-
-  initViewer(current.pano);
 
   guessPos = null;
 
@@ -258,16 +187,15 @@ function loadRound(){
     pin.remove();
     pin = null;
   }
+
+  initViewer(current.pano);
 }
 
 /* ================= MAP TOGGLE ================= */
 
-const mapPanel =
-  document.getElementById("mapPanel");
+const mapPanel = document.getElementById("mapPanel");
 
-document
-.getElementById("mapBtn")
-.addEventListener("click",()=>{
+document.getElementById("mapBtn").addEventListener("click",()=>{
 
   mapPanel.classList.toggle("open");
 
@@ -278,9 +206,7 @@ document
 
 /* ================= GUESS ================= */
 
-document
-.getElementById("guessBtn")
-.addEventListener("click",()=>{
+document.getElementById("guessBtn").addEventListener("click",()=>{
 
   if(!guessPos){
     alert("Place a marker first.");
@@ -294,45 +220,29 @@ document
     current.lng
   );
 
-  alert(
-    current.name +
-    "\nDistance: " +
-    Math.round(dist) +
-    " km"
-  );
+  alert(current.name + "\nDistance: " + Math.round(dist) + " km");
 
-  // close map after guess
   mapPanel.classList.remove("open");
 
   loadRound();
 });
 
-/* ================= DISTANCE ================= */
+/* ================= DIST ================= */
 
 function haversine(a,b,c,d){
 
   const R = 6371;
+  const toRad = x => x * Math.PI / 180;
 
-  const toRad =
-    x => x * Math.PI / 180;
-
-  const dLat =
-    toRad(c-a);
-
-  const dLng =
-    toRad(d-b);
+  const dLat = toRad(c-a);
+  const dLng = toRad(d-b);
 
   const s =
     Math.sin(dLat/2)**2 +
-    Math.cos(toRad(a)) *
-    Math.cos(toRad(c)) *
+    Math.cos(toRad(a))*Math.cos(toRad(c))*
     Math.sin(dLng/2)**2;
 
-  return R * 2 *
-    Math.atan2(
-      Math.sqrt(s),
-      Math.sqrt(1-s)
-    );
+  return R * 2 * Math.atan2(Math.sqrt(s), Math.sqrt(1-s));
 }
 
 /* ================= START ================= */
@@ -341,6 +251,7 @@ window.addEventListener("load",()=>{
 
   initMap();
   loadRound();
+
 });
 
 </script>

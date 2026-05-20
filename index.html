@@ -24,7 +24,7 @@ html,body{
   flex-direction:column;
 }
 
-/* TOP IMAGE */
+/* IMAGE */
 #photo{
   flex:1;
   width:100%;
@@ -34,14 +34,14 @@ html,body{
   background:#111;
 }
 
-/* MAP BOTTOM */
+/* MAP */
 #map{
   flex:1;
   width:100%;
   min-height:0;
 }
 
-/* FORCE LEAFLET TO FILL */
+/* Leaflet hard fill fix */
 .leaflet-container{
   width:100% !important;
   height:100% !important;
@@ -59,7 +59,6 @@ button{
 
 <body>
 
-<!-- GAME -->
 <div id="game" class="screen active">
   <img id="photo">
   <div id="map"></div>
@@ -71,9 +70,9 @@ button{
 <script>
 
 const STATE = {
-  lat:43.6426,
-  lng:-79.3871,
-  wiki:"CN Tower"
+  lat: 43.6426,
+  lng: -79.3871,
+  wiki: "CN Tower"
 };
 
 let map;
@@ -109,7 +108,7 @@ function initMap(){
     }).addTo(map);
   });
 
-  // FIX: proper repaint after layout settles
+  // stable render fix
   setTimeout(()=>{
     map.invalidateSize();
   },200);
@@ -140,12 +139,6 @@ function loadImage(){
     });
 }
 
-/* ================= START ================= */
-function start(){
-  initMap();
-  loadImage();
-}
-
 /* ================= GUESS ================= */
 function guess(){
   if(!guessPos) return;
@@ -164,15 +157,23 @@ function guess(){
 function haversine(a,b,c,d){
   const R=6371,toRad=x=>x*Math.PI/180;
   const dLat=toRad(c-a), dLng=toRad(d-b);
-  const s=
+
+  const s =
     Math.sin(dLat/2)**2 +
     Math.cos(toRad(a))*Math.cos(toRad(c))*Math.sin(dLng/2)**2;
 
-  return R*2*Math.atan2(Math.sqrt(s),Math.sqrt(1-s));
+  return R * 2 * Math.atan2(Math.sqrt(s), Math.sqrt(1-s));
 }
 
-/* AUTO START */
-start();
+/* ================= START (FIXED TIMING) ================= */
+window.addEventListener("load", () => {
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      loadImage();
+      initMap();
+    });
+  });
+});
 
 </script>
 

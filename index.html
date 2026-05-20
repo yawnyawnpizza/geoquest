@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>GeoQuest Fixed</title>
+<title>GeoQuest Free Street View</title>
 
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
 
@@ -11,44 +11,28 @@
 html,body{
   margin:0;
   height:100%;
-  width:100%;
-  background:#000;
-  overflow:hidden;
+  background:black;
 }
 
-.screen{
-  position:fixed;
-  inset:0;
-  display:flex;
-  flex-direction:column;
-}
-
-/* IMAGE */
-#photo{
-  flex:1;
-  min-height:0;
+/* TOP "STREET VIEW" IMAGE */
+#pano{
+  height:60%;
   width:100%;
-  background:#111;
   background-size:cover;
   background-position:center;
+  background-repeat:no-repeat;
 }
 
-/* MAP */
+/* BOTTOM MAP */
 #map{
-  flex:1;
-  min-height:0;
+  height:40%;
   width:100%;
-}
-
-.leaflet-container{
-  width:100% !important;
-  height:100% !important;
 }
 
 button{
   position:fixed;
-  right:10px;
   bottom:10px;
+  right:10px;
   z-index:9999;
 }
 </style>
@@ -56,41 +40,60 @@ button{
 
 <body>
 
-<div id="game" class="screen">
-  <div id="photo"></div>
-  <div id="map"></div>
-  <button onclick="guess()">Guess</button>
-</div>
+<div id="pano"></div>
+<div id="map"></div>
+<button onclick="guess()">Guess</button>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
 
 <script>
 
-const STATE = {
-  lat: 43.6426,
-  lng: -79.3871,
-  wiki: "CN Tower"
-};
+/* ================= GAME DATA =================
+   You will add more locations here later
+*/
+const LOCATIONS = [
+  {
+    name: "CN Tower",
+    lat: 43.6426,
+    lng: -79.3871,
+    image: "https://upload.wikimedia.org/wikipedia/commons/9/9c/CN_Tower_from_Below.jpg"
+  },
+  {
+    name: "Eiffel Tower",
+    lat: 48.8584,
+    lng: 2.2945,
+    image: "https://upload.wikimedia.org/wikipedia/commons/a/a8/Tour_Eiffel_Wikimedia_Commons.jpg"
+  },
+  {
+    name: "Statue of Liberty",
+    lat: 40.6892,
+    lng: -74.0445,
+    image: "https://upload.wikimedia.org/wikipedia/commons/a/a1/Statue_of_Liberty_7.jpg"
+  }
+];
 
+let current = null;
 let map;
-let pin;
 let guessPos = null;
+let pin;
 
-/* ================= IMAGE (NO API - GUARANTEED WORKING) ================= */
-function loadImage(){
+/* ================= LOAD ROUND ================= */
+function loadRound(){
+  current = LOCATIONS[Math.floor(Math.random() * LOCATIONS.length)];
 
-  // 🔥 direct working image (always loads)
-  const imgUrl =
-    "https://upload.wikimedia.org/wikipedia/commons/9/9c/CN_Tower_from_Below.jpg";
+  document.getElementById("pano").style.backgroundImage =
+    `url(${current.image})`;
 
-  document.getElementById("photo").style.backgroundImage =
-    `url(${imgUrl})`;
+  guessPos = null;
+
+  if(pin){
+    pin.remove();
+    pin = null;
+  }
 }
 
 /* ================= MAP ================= */
 function initMap(){
-
-  if(map) map.remove();
 
   map = L.map('map',{
     zoomControl:true,
@@ -115,25 +118,30 @@ function initMap(){
       fillOpacity:1
     }).addTo(map);
   });
-
-  setTimeout(()=>map.invalidateSize(),200);
 }
 
 /* ================= GUESS ================= */
 function guess(){
-  if(!guessPos) return;
+  if(!guessPos || !current) return;
 
   const dist = haversine(
     guessPos.lat,
     guessPos.lng,
-    STATE.lat,
-    STATE.lng
+    current.lat,
+    current.lng
   );
 
-  alert("Distance: " + Math.round(dist) + " km");
+  alert(
+    current.name +
+    "\nDistance: " +
+    Math.round(dist) +
+    " km"
+  );
+
+  loadRound();
 }
 
-/* ================= DIST ================= */
+/* ================= DISTANCE ================= */
 function haversine(a,b,c,d){
   const R = 6371;
   const toRad = x => x * Math.PI / 180;
@@ -143,16 +151,16 @@ function haversine(a,b,c,d){
 
   const s =
     Math.sin(dLat/2)**2 +
-    Math.cos(toRad(a)) * Math.cos(toRad(c)) *
+    Math.cos(toRad(a))*Math.cos(toRad(c))*
     Math.sin(dLng/2)**2;
 
-  return R * 2 * Math.atan2(Math.sqrt(s), Math.sqrt(1 - s));
+  return R * 2 * Math.atan2(Math.sqrt(s), Math.sqrt(1-s));
 }
 
 /* ================= START ================= */
 function start(){
-  loadImage();
   initMap();
+  loadRound();
 }
 
 window.addEventListener("load", start);

@@ -75,7 +75,9 @@ html,body{
   z-index:5000;
 }
 
-#mapPanel.open{ transform:translateY(0); }
+#mapPanel.open{
+  transform:translateY(0);
+}
 
 #map{ width:100%; height:100%; }
 
@@ -92,8 +94,8 @@ button{
   position:fixed;
   bottom:10px;
   left:10px;
-  z-index:9999;
   background:#c9a84c;
+  z-index:9999;
 }
 
 #guessBtn{
@@ -162,23 +164,21 @@ let settings={
   admin:false
 };
 
-/* ================= TERMINAL STATE ================= */
+/* ================= TERMINAL ================= */
 
 let lines=[];
 let input="";
-
 const terminal=document.getElementById("terminal");
 
 /* ================= BOOT ================= */
 
 function boot(){
 
-  lines.push("GeoQuest OS booting...");
-  lines.push("loading world engine... OK");
+  lines.push("GeoQuest booting...");
+  lines.push("loading systems... OK");
   lines.push("");
   lines.push("type: help");
   lines.push("start() to begin");
-  lines.push("");
 
   render();
 }
@@ -186,7 +186,6 @@ function boot(){
 /* ================= RENDER ================= */
 
 function render(){
-
   terminal.innerHTML =
     lines.join("\n") +
     "\n\n> " + input +
@@ -216,17 +215,47 @@ document.addEventListener("keydown",(e)=>{
   render();
 });
 
-/* ================= COMMAND ENGINE ================= */
+/* ================= LOG ================= */
 
 function log(msg){
   lines.push(msg);
   render();
 }
 
-function execute(cmd){
+/* ================= CHEATS ================= */
 
-  cmd=cmd.trim().replace(/\s*=\s*/g,"=");
+const cheats = {
 
+  "godmode": () => {
+    if(!settings.admin) return log("admin required");
+    log("godmode ON");
+  },
+
+  "reveal()": () => {
+    if(!settings.admin) return log("admin required");
+    log("reveal enabled");
+  },
+
+  "skip()": () => {
+    if(!settings.admin) return log("admin required");
+    log("round skipped");
+    nextRound();
+  },
+
+  "addscore 9999": () => {
+    score += 9999;
+    document.getElementById("score").innerText = score;
+    log("score boosted");
+  }
+};
+
+/* ================= COMMAND ENGINE ================= */
+
+function execute(raw){
+
+  let cmd = raw.trim().toLowerCase().replace(/\s*=\s*/g,"=");
+
+  /* HELP */
   if(cmd==="help"){
     log("timeLimit = x");
     log("difficulty = x");
@@ -236,52 +265,38 @@ function execute(cmd){
     return;
   }
 
-  if(cmd==="cheats()"){
-    log("godmode");
-    log("reveal()");
-    log("skip()");
-    log("addscore 9999");
+  /* CHEATS LIST */
+  if(cmd==="cheats()"||cmd==="cheats"){
+    log("=== CHEATS ===");
+    for(const c in cheats){
+      log(c);
+    }
     return;
   }
 
+  /* ADMIN */
   if(cmd==="admin()"){
     settings.admin=true;
     log("ADMIN MODE ENABLED");
     return;
   }
 
-  if(cmd==="godmode" && settings.admin){
-    log("godmode ON");
+  /* CHEAT EXEC */
+  if(cheats[cmd]){
+    cheats[cmd]();
     return;
   }
 
-  if(cmd==="reveal()" && settings.admin){
-    log("hints always on");
-    return;
-  }
-
-  if(cmd==="skip()" && settings.admin){
-    log("round skipped");
-    nextRound();
-    return;
-  }
-
-  if(cmd==="addscore 9999"){
-    score+=9999;
-    document.getElementById("score").innerText=score;
-    log("score boosted");
-    return;
-  }
-
+  /* ASSIGNMENT */
   if(cmd.includes("=")){
     let [k,v]=cmd.split("=");
     v=eval(v);
-
     settings[k]=v;
     log(k+" = "+v);
     return;
   }
 
+  /* START */
   if(cmd==="start()"||cmd==="start"){
     document.getElementById("menu").style.display="none";
     initMap();
@@ -300,6 +315,7 @@ function loadPanorama(img){
     container:document.getElementById("viewer"),
     panorama:img
   });
+
   document.getElementById("viewer").style.filter="blur(0px)";
 }
 
@@ -375,7 +391,7 @@ document.getElementById("nextBtn").onclick=()=>{
   nextRound();
 };
 
-/* ================= MAP ================= */
+/* ================= MAP TOGGLE ================= */
 
 document.getElementById("mapBtn").onclick=()=>{
   document.getElementById("mapPanel").classList.toggle("open");

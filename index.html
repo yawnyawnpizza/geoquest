@@ -47,9 +47,10 @@ html,body{
   width:100%;
   height:100%;
   filter:blur(10px);
-  transition:filter 0.8s ease;
+  transition:filter 0.6s ease;
 }
 
+/* ================= HUD ================= */
 #hud{
   position:fixed;
   top:10px;
@@ -79,7 +80,10 @@ html,body{
   transform:translateY(0);
 }
 
-#map{ width:100%; height:100%; }
+#map{
+  width:100%;
+  height:100%;
+}
 
 /* ================= BUTTONS ================= */
 button{
@@ -90,25 +94,30 @@ button{
   cursor:pointer;
 }
 
+/* ALWAYS VISIBLE GUESS BUTTON (FIX) */
+#guessBtn{
+  position:fixed;
+  right:20px;
+  bottom:20px;
+  z-index:99999;
+  background:white;
+  display:none;
+}
+
+/* MAP BUTTON */
 #mapBtn{
   position:fixed;
-  bottom:10px;
   left:10px;
-  background:#c9a84c;
-  z-index:9999;
-}
-
-#guessBtn{
-  position:absolute;
-  right:10px;
   bottom:10px;
-  background:white;
+  z-index:9999;
+  background:#c9a84c;
 }
 
+/* NEXT BUTTON */
 #nextBtn{
   position:fixed;
-  top:10px;
   right:10px;
+  top:10px;
   z-index:9999;
   display:none;
 }
@@ -133,10 +142,10 @@ Hint: <span id="hint">---</span>
 
 <div id="mapPanel">
   <div id="map"></div>
-  <button id="guessBtn">Guess</button>
 </div>
 
 <button id="mapBtn">Map</button>
+<button id="guessBtn">Guess</button>
 <button id="nextBtn">Next</button>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
@@ -158,32 +167,18 @@ let current,guessPos;
 
 let round=0,score=0;
 
-let settings={
-  timeLimit:5,
-  difficulty:2,
-  admin:false
-};
-
 /* ================= TERMINAL ================= */
 
 let lines=[];
 let input="";
 const terminal=document.getElementById("terminal");
 
-/* ================= BOOT ================= */
-
 function boot(){
-
   lines.push("GeoQuest booting...");
-  lines.push("loading systems... OK");
-  lines.push("");
-  lines.push("type: help");
-  lines.push("start() to begin");
-
+  lines.push("systems online...");
+  lines.push("type start()");
   render();
 }
-
-/* ================= RENDER ================= */
 
 function render(){
   terminal.innerHTML =
@@ -201,13 +196,11 @@ document.addEventListener("keydown",(e)=>{
   if(e.key==="Backspace"){
     input=input.slice(0,-1);
   }
-
   else if(e.key==="Enter"){
     lines.push("> " + input);
     execute(input);
     input="";
   }
-
   else if(e.key.length===1){
     input+=e.key;
   }
@@ -215,117 +208,42 @@ document.addEventListener("keydown",(e)=>{
   render();
 });
 
-/* ================= LOG ================= */
+/* ================= COMMAND ================= */
 
 function log(msg){
   lines.push(msg);
   render();
 }
 
-/* ================= CHEATS ================= */
+function execute(cmd){
 
-const cheats = {
+  cmd=cmd.trim().toLowerCase();
 
-  "godmode": () => {
-    if(!settings.admin) return log("admin required");
-    log("godmode ON");
-  },
-
-  "reveal()": () => {
-    if(!settings.admin) return log("admin required");
-    log("reveal enabled");
-  },
-
-  "skip()": () => {
-    if(!settings.admin) return log("admin required");
-    log("round skipped");
-    nextRound();
-  },
-
-  "addscore 9999": () => {
-    score += 9999;
-    document.getElementById("score").innerText = score;
-    log("score boosted");
-  }
-};
-
-/* ================= COMMAND ENGINE ================= */
-
-function execute(raw){
-
-  let cmd = raw.trim().toLowerCase().replace(/\s*=\s*/g,"=");
-
-  /* HELP */
-  if(cmd==="help"){
-    log("timeLimit = x");
-    log("difficulty = x");
-    log("start()");
-    log("cheats()");
-    log("admin()");
-    return;
-  }
-
-  /* CHEATS LIST */
-  if(cmd==="cheats()"||cmd==="cheats"){
-    log("=== CHEATS ===");
-    for(const c in cheats){
-      log(c);
-    }
-    return;
-  }
-
-  /* ADMIN */
-  if(cmd==="admin()"){
-    settings.admin=true;
-    log("ADMIN MODE ENABLED");
-    return;
-  }
-
-  /* CHEAT EXEC */
-  if(cheats[cmd]){
-    cheats[cmd]();
-    return;
-  }
-
-  /* ASSIGNMENT */
-  if(cmd.includes("=")){
-    let [k,v]=cmd.split("=");
-    v=eval(v);
-    settings[k]=v;
-    log(k+" = "+v);
-    return;
-  }
-
-  /* START */
   if(cmd==="start()"||cmd==="start"){
     document.getElementById("menu").style.display="none";
-    initMap();
-    nextRound();
+
+    setTimeout(()=>{
+      initMap();
+      nextRound();
+      document.getElementById("guessBtn").style.display="block";
+    },300);
+
     return;
   }
 
   log("unknown command");
 }
 
-/* ================= GAME ================= */
-
-function loadPanorama(img){
-  document.getElementById("viewer").innerHTML="";
-  viewer=new Viewer({
-    container:document.getElementById("viewer"),
-    panorama:img
-  });
-
-  document.getElementById("viewer").style.filter="blur(0px)";
-}
-
-/* ================= MAP ================= */
+/* ================= MAP (FIXED INIT) ================= */
 
 function initMap(){
 
   map=L.map("map",{attributionControl:false});
 
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19}).addTo(map);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{
+    maxZoom:19,
+    updateWhenIdle:false
+  }).addTo(map);
 
   map.setView([20,0],2);
 
@@ -341,6 +259,21 @@ function initMap(){
       fillOpacity:1
     }).addTo(map);
   });
+
+  /* CRITICAL FIX */
+  setTimeout(()=>map.invalidateSize(true),400);
+}
+
+/* ================= PANORAMA ================= */
+
+function loadPanorama(img){
+  document.getElementById("viewer").innerHTML="";
+  viewer=new Viewer({
+    container:document.getElementById("viewer"),
+    panorama:img
+  });
+
+  document.getElementById("viewer").style.filter="blur(0px)";
 }
 
 /* ================= ROUND ================= */
@@ -395,7 +328,7 @@ document.getElementById("nextBtn").onclick=()=>{
 
 document.getElementById("mapBtn").onclick=()=>{
   document.getElementById("mapPanel").classList.toggle("open");
-  setTimeout(()=>map.invalidateSize(),300);
+  setTimeout(()=>map.invalidateSize(true),300);
 };
 
 /* ================= DIST ================= */
@@ -403,9 +336,10 @@ document.getElementById("mapBtn").onclick=()=>{
 function haversine(a,b,c,d){
   const R=6371,toRad=x=>x*Math.PI/180;
   const dLat=toRad(c-a);
-  const dLng=toRad(d-b);
+  const dLng=toRad(b-d);
   const s=Math.sin(dLat/2)**2+
-  Math.cos(toRad(a))*Math.cos(toRad(c))*Math.sin(dLng/2)**2;
+    Math.cos(toRad(a))*Math.cos(toRad(c))*
+    Math.sin(dLng/2)**2;
   return R*2*Math.atan2(Math.sqrt(s),Math.sqrt(1-s));
 }
 

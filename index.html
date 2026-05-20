@@ -86,7 +86,6 @@ html,body{
 }
 
 /* ================= BUTTONS ================= */
-
 button{
   border:none;
   padding:10px 14px;
@@ -104,7 +103,7 @@ button{
   background:#c9a84c;
 }
 
-/* GUARANTEED VISIBLE GUESS BUTTON */
+/* GUESS BUTTON ALWAYS VISIBLE */
 #guessBtn{
   position:fixed;
   right:20px;
@@ -120,6 +119,41 @@ button{
   top:10px;
   z-index:9999;
   display:none;
+}
+
+/* ================= RESULTS SCREEN ================= */
+#results{
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,0.75);
+  display:none;
+  align-items:center;
+  justify-content:center;
+  z-index:9999999;
+}
+
+#resultsBox{
+  background:#111;
+  color:white;
+  padding:25px;
+  border-radius:12px;
+  text-align:center;
+  width:280px;
+  border:1px solid #333;
+}
+
+#resultsBox h2{
+  margin:0 0 10px 0;
+}
+
+#resultsBox p{
+  margin:6px 0;
+  color:#ccc;
+}
+
+#resNext{
+  margin-top:15px;
+  background:#c9a84c;
 }
 </style>
 </head>
@@ -148,13 +182,23 @@ Hint: <span id="hint">---</span>
 <button id="guessBtn">Guess</button>
 <button id="nextBtn">Next</button>
 
+<!-- RESULTS -->
+<div id="results">
+  <div id="resultsBox">
+    <h2>Result</h2>
+    <p id="resDistance"></p>
+    <p id="resPoints"></p>
+    <button id="resNext">Next Round</button>
+  </div>
+</div>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
 
 <script type="module">
 
 import { Viewer } from "https://cdn.jsdelivr.net/npm/@photo-sphere-viewer/core/+esm";
 
-/* ================= DATA ================= */
+/* ================= LOCATIONS ================= */
 
 const LOCATIONS = [
   {name:"NYC",lat:40.7128,lng:-74.0060,pano:"https://photo-sphere-viewer-data.netlify.app/assets/sphere.jpg",hint:"North America"},
@@ -210,11 +254,6 @@ document.addEventListener("keydown",(e)=>{
 
 /* ================= COMMAND ================= */
 
-function log(msg){
-  lines.push(msg);
-  render();
-}
-
 function execute(cmd){
 
   cmd=cmd.trim().toLowerCase();
@@ -230,7 +269,8 @@ function execute(cmd){
     return;
   }
 
-  log("unknown command");
+  lines.push("unknown command");
+  render();
 }
 
 /* ================= MAP ================= */
@@ -295,7 +335,7 @@ function nextRound(){
   loadPanorama(current.pano);
 }
 
-/* ================= GUESS (FIXED ALWAYS WORKS) ================= */
+/* ================= GUESS ================= */
 
 document.getElementById("guessBtn").onclick=()=>{
 
@@ -311,20 +351,33 @@ document.getElementById("guessBtn").onclick=()=>{
     current.lng
   );
 
-  let s=Math.max(0,Math.round(5000-d*2));
+  let points=Math.max(0,Math.round(5000-d*2));
 
-  score+=s;
+  score+=points;
   document.getElementById("score").innerText=score;
 
-  alert(current.name+" +"+s);
-
-  document.getElementById("nextBtn").style.display="block";
+  showResults(d,points);
 };
 
-/* ================= NEXT ================= */
+/* ================= RESULTS ================= */
 
-document.getElementById("nextBtn").onclick=()=>{
-  document.getElementById("nextBtn").style.display="none";
+function showResults(distance,points){
+
+  document.getElementById("resDistance").innerText=
+    "You were " + Math.round(distance) + " km away";
+
+  document.getElementById("resPoints").innerText=
+    "You earned " + points + " points";
+
+  document.getElementById("results").style.display="flex";
+}
+
+/* ================= NEXT ROUND ================= */
+
+document.getElementById("resNext").onclick=()=>{
+
+  document.getElementById("results").style.display="none";
+
   nextRound();
 };
 
@@ -339,6 +392,7 @@ document.getElementById("mapBtn").onclick=()=>{
 
 function haversine(a,b,c,d){
   const R=6371,toRad=x=>x*Math.PI/180;
+
   const dLat=toRad(c-a);
   const dLng=toRad(d-b);
 

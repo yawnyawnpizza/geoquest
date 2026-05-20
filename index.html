@@ -139,7 +139,7 @@ Score: <span id="score">0</span>
     <h2>Result</h2>
     <p id="resDistance"></p>
     <p id="resPoints"></p>
-    <button onclick="nextRound()">Next</button>
+    <button onclick="nextRound()">Next Round</button>
   </div>
 </div>
 
@@ -149,7 +149,12 @@ Score: <span id="score">0</span>
 
 import { Viewer } from "https://cdn.jsdelivr.net/npm/@photo-sphere-viewer/core/+esm";
 
-/* ================= NODE MAP (STREET VIEW SYSTEM) ================= */
+/* ================= SAFE FALLBACK ================= */
+
+const FALLBACK_PANO =
+"https://photo-sphere-viewer-data.netlify.app/assets/sphere.jpg";
+
+/* ================= NODE MAP ================= */
 
 const NODES = {
   nyc: {
@@ -174,23 +179,42 @@ const NODES = {
   }
 };
 
-let currentNode = "nyc";
+let currentNode="nyc";
 let viewer,map,pin,guessPos;
-
 let score=0;
+let loadToken=0;
+
+/* ================= SAFE IMAGE LOAD ================= */
+
+function loadImageSafe(url){
+  return new Promise(resolve=>{
+    const img=new Image();
+
+    img.onload=()=>resolve(url);
+    img.onerror=()=>resolve(FALLBACK_PANO);
+
+    img.src=url;
+  });
+}
 
 /* ================= LOAD NODE ================= */
 
-function loadNode(id){
+async function loadNode(id){
 
-  currentNode = id;
-  const node = NODES[id];
+  const token=++loadToken;
+
+  currentNode=id;
+  const node=NODES[id];
+
+  const safe=await loadImageSafe(node.pano);
+
+  if(token!==loadToken) return;
 
   document.getElementById("viewer").innerHTML="";
 
-  viewer = new Viewer({
+  viewer=new Viewer({
     container:document.getElementById("viewer"),
-    panorama:node.pano
+    panorama:safe
   });
 
   renderMoves();
@@ -200,12 +224,12 @@ function loadNode(id){
 
 function renderMoves(){
 
-  const ui = document.getElementById("moveUI");
-  ui.innerHTML = "";
+  const ui=document.getElementById("moveUI");
+  ui.innerHTML="";
 
   NODES[currentNode].links.forEach(link=>{
 
-    const b = document.createElement("button");
+    const b=document.createElement("button");
     b.className="moveBtn";
     b.innerText="Move";
 
@@ -221,7 +245,8 @@ function initMap(){
 
   map=L.map("map").setView([20,0],2);
 
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png")
+  .addTo(map);
 
   map.on("click",e=>{
     guessPos=e.latlng;
@@ -241,24 +266,24 @@ function initMap(){
 
 document.getElementById("guessBtn").onclick=()=>{
 
-  if(!guessPos) return;
+  if(!guessPos)return;
 
-  const node = NODES[currentNode];
+  const node=NODES[currentNode];
 
-  let d = haversine(
+  let d=haversine(
     guessPos.lat,guessPos.lng,
     node.lat,node.lng
   );
 
-  let points = Math.max(0,Math.round(5000-d*2));
+  let points=Math.max(0,Math.round(5000-d*2));
 
-  score += points;
-  document.getElementById("score").innerText = score;
+  score+=points;
+  document.getElementById("score").innerText=score;
 
-  document.getElementById("resDistance").innerText =
+  document.getElementById("resDistance").innerText=
     "You were " + Math.round(d) + " km away";
 
-  document.getElementById("resPoints").innerText =
+  document.getElementById("resPoints").innerText=
     "Points: " + points;
 
   document.getElementById("results").style.display="flex";
@@ -266,7 +291,7 @@ document.getElementById("guessBtn").onclick=()=>{
 
 /* ================= NEXT ================= */
 
-window.nextRound = function(){
+window.nextRound=function(){
   document.getElementById("results").style.display="none";
   loadNode("nyc");
 };
@@ -282,11 +307,15 @@ document.getElementById("mapBtn").onclick=()=>{
 
 function haversine(a,b,c,d){
   const R=6371,toRad=x=>x*Math.PI/180;
+
   const dLat=toRad(c-a);
   const dLng=toRad(d-b);
-  const s=Math.sin(dLat/2)**2+
+
+  const s=
+    Math.sin(dLat/2)**2 +
     Math.cos(toRad(a))*Math.cos(toRad(c))*
     Math.sin(dLng/2)**2;
+
   return R*2*Math.atan2(Math.sqrt(s),Math.sqrt(1-s));
 }
 

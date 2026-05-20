@@ -42,7 +42,7 @@ html,body{
   50%{opacity:0;}
 }
 
-/* ================= GAME ================= */
+/* ================= VIEW ================= */
 #viewer{
   width:100%;
   height:100%;
@@ -86,22 +86,13 @@ html,body{
 }
 
 /* ================= BUTTONS ================= */
+
 button{
   border:none;
   padding:10px 14px;
   border-radius:8px;
   font-weight:bold;
   cursor:pointer;
-}
-
-/* ALWAYS VISIBLE GUESS BUTTON (FIX) */
-#guessBtn{
-  position:fixed;
-  right:20px;
-  bottom:20px;
-  z-index:99999;
-  background:white;
-  display:none;
 }
 
 /* MAP BUTTON */
@@ -111,6 +102,15 @@ button{
   bottom:10px;
   z-index:9999;
   background:#c9a84c;
+}
+
+/* GUARANTEED VISIBLE GUESS BUTTON */
+#guessBtn{
+  position:fixed;
+  right:20px;
+  bottom:20px;
+  z-index:999999;
+  background:white;
 }
 
 /* NEXT BUTTON */
@@ -225,8 +225,7 @@ function execute(cmd){
     setTimeout(()=>{
       initMap();
       nextRound();
-      document.getElementById("guessBtn").style.display="block";
-    },300);
+    },200);
 
     return;
   }
@@ -234,15 +233,14 @@ function execute(cmd){
   log("unknown command");
 }
 
-/* ================= MAP (FIXED INIT) ================= */
+/* ================= MAP ================= */
 
 function initMap(){
 
   map=L.map("map",{attributionControl:false});
 
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{
-    maxZoom:19,
-    updateWhenIdle:false
+    maxZoom:19
   }).addTo(map);
 
   map.setView([20,0],2);
@@ -260,14 +258,15 @@ function initMap(){
     }).addTo(map);
   });
 
-  /* CRITICAL FIX */
-  setTimeout(()=>map.invalidateSize(true),400);
+  setTimeout(()=>map.invalidateSize(true),300);
 }
 
 /* ================= PANORAMA ================= */
 
 function loadPanorama(img){
+
   document.getElementById("viewer").innerHTML="";
+
   viewer=new Viewer({
     container:document.getElementById("viewer"),
     panorama:img
@@ -296,15 +295,20 @@ function nextRound(){
   loadPanorama(current.pano);
 }
 
-/* ================= GUESS ================= */
+/* ================= GUESS (FIXED ALWAYS WORKS) ================= */
 
 document.getElementById("guessBtn").onclick=()=>{
 
-  if(!guessPos)return;
+  if(!guessPos){
+    alert("Pick a location first");
+    return;
+  }
 
   let d=haversine(
-    guessPos.lat,guessPos.lng,
-    current.lat,current.lng
+    guessPos.lat,
+    guessPos.lng,
+    current.lat,
+    current.lng
   );
 
   let s=Math.max(0,Math.round(5000-d*2));
@@ -336,10 +340,13 @@ document.getElementById("mapBtn").onclick=()=>{
 function haversine(a,b,c,d){
   const R=6371,toRad=x=>x*Math.PI/180;
   const dLat=toRad(c-a);
-  const dLng=toRad(b-d);
-  const s=Math.sin(dLat/2)**2+
+  const dLng=toRad(d-b);
+
+  const s=
+    Math.sin(dLat/2)**2 +
     Math.cos(toRad(a))*Math.cos(toRad(c))*
     Math.sin(dLng/2)**2;
+
   return R*2*Math.atan2(Math.sqrt(s),Math.sqrt(1-s));
 }
 

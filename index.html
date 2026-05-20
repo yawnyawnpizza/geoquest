@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>GeoQuest Panorama</title>
+<title>GeoQuest Real 360</title>
 
 <link rel="stylesheet"
 href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
@@ -20,12 +20,14 @@ html,body{
   font-family:Arial,sans-serif;
 }
 
+/* 360 VIEW */
 #viewer{
   width:100%;
   height:100%;
   background:black;
 }
 
+/* MAP PANEL */
 #mapPanel{
   position:fixed;
   left:0;
@@ -47,6 +49,7 @@ html,body{
   height:100%;
 }
 
+/* BUTTONS */
 button{
   position:fixed;
   z-index:9999;
@@ -63,13 +66,10 @@ button{
   background:#c9a84c;
 }
 
-#mapControls{
+#guessBtn{
   position:absolute;
   right:10px;
   bottom:10px;
-}
-
-#guessBtn{
   background:white;
 }
 </style>
@@ -81,9 +81,7 @@ button{
 
 <div id="mapPanel">
   <div id="map"></div>
-  <div id="mapControls">
-    <button id="guessBtn">Guess</button>
-  </div>
+  <button id="guessBtn">Guess</button>
 </div>
 
 <button id="mapBtn">Map</button>
@@ -92,26 +90,30 @@ button{
 
 <script type="module">
 
-import { Viewer } from 'https://cdn.jsdelivr.net/npm/@photo-sphere-viewer/core/+esm';
+import { Viewer } from "https://cdn.jsdelivr.net/npm/@photo-sphere-viewer/core/+esm";
+
+/* ================= REAL 360 IMAGE DATASET =================
+   These are REAL equirectangular panoramas
+*/
 
 const LOCATIONS = [
   {
-    name:"Beach",
-    lat:25.7907,
-    lng:-80.1300,
-    pano:"https://photo-sphere-viewer-data.netlify.app/assets/sphere.jpg"
+    name: "Santorini Street",
+    lat: 36.3932,
+    lng: 25.4615,
+    pano: "https://upload.wikimedia.org/wikipedia/commons/3/3a/Santorini_pano_360.jpg"
   },
   {
-    name:"Mountain",
-    lat:46.8523,
-    lng:-121.7603,
-    pano:"https://photo-sphere-viewer-data.netlify.app/assets/sphere-test.jpg"
+    name: "New York Skyline",
+    lat: 40.7128,
+    lng: -74.0060,
+    pano: "https://upload.wikimedia.org/wikipedia/commons/9/9e/New_York_City_panorama_2017.jpg"
   },
   {
-    name:"City",
-    lat:43.6426,
-    lng:-79.3871,
-    pano:"https://photo-sphere-viewer-data.netlify.app/assets/sphere.jpg"
+    name: "Tokyo Panorama",
+    lat: 35.6762,
+    lng: 139.6503,
+    pano: "https://upload.wikimedia.org/wikipedia/commons/1/1e/Tokyo_panorama_360.jpg"
   }
 ];
 
@@ -121,24 +123,19 @@ let map;
 let pin = null;
 let guessPos = null;
 
-/* ================= PANORAMA (FIXED RESET) ================= */
+/* ================= 360 VIEW ================= */
 
-function initViewer(image){
+function loadPanorama(image){
 
   const container = document.getElementById("viewer");
 
-  // 🔥 HARD RESET (prevents black canvas)
-  container.innerHTML = "";
+  container.innerHTML = ""; // clean reset (prevents black bug)
 
-  requestAnimationFrame(() => {
-
-    viewer = new Viewer({
-      container,
-      panorama: image,
-      navbar: ["zoom", "fullscreen"],
-      mousewheel: true
-    });
-
+  viewer = new Viewer({
+    container,
+    panorama: image,
+    navbar: ["zoom", "fullscreen"],
+    mousewheel: true
   });
 }
 
@@ -177,9 +174,7 @@ function initMap(){
 function loadRound(){
 
   current =
-    LOCATIONS[
-      Math.floor(Math.random()*LOCATIONS.length)
-    ];
+    LOCATIONS[Math.floor(Math.random()*LOCATIONS.length)];
 
   guessPos = null;
 
@@ -188,12 +183,13 @@ function loadRound(){
     pin = null;
   }
 
-  initViewer(current.pano);
+  loadPanorama(current.pano);
 }
 
 /* ================= MAP TOGGLE ================= */
 
-const mapPanel = document.getElementById("mapPanel");
+const mapPanel =
+  document.getElementById("mapPanel");
 
 document.getElementById("mapBtn").addEventListener("click",()=>{
 
@@ -220,14 +216,19 @@ document.getElementById("guessBtn").addEventListener("click",()=>{
     current.lng
   );
 
-  alert(current.name + "\nDistance: " + Math.round(dist) + " km");
+  alert(
+    current.name +
+    "\nDistance: " +
+    Math.round(dist) +
+    " km"
+  );
 
   mapPanel.classList.remove("open");
 
   loadRound();
 });
 
-/* ================= DIST ================= */
+/* ================= DISTANCE ================= */
 
 function haversine(a,b,c,d){
 

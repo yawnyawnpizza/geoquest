@@ -16,7 +16,7 @@ html,body{
   overflow:hidden;
 }
 
-/* FULL SCREEN FIX */
+/* SCREEN LAYOUT */
 .screen{
   position:fixed;
   inset:0;
@@ -24,24 +24,24 @@ html,body{
   flex-direction:column;
 }
 
-/* IMAGE */
+/* IMAGE (FIXED) */
 #photo{
   flex:1;
-  width:100%;
   min-height:0;
-  object-fit:cover;
-  display:block;
+  width:100%;
   background:#111;
+  background-size:cover;
+  background-position:center;
 }
 
 /* MAP */
 #map{
   flex:1;
-  width:100%;
   min-height:0;
+  width:100%;
 }
 
-/* Leaflet hard fill fix */
+/* Leaflet safety */
 .leaflet-container{
   width:100% !important;
   height:100% !important;
@@ -59,8 +59,8 @@ button{
 
 <body>
 
-<div id="game" class="screen active">
-  <img id="photo">
+<div id="game" class="screen">
+  <div id="photo"></div>
   <div id="map"></div>
   <button onclick="guess()">Guess</button>
 </div>
@@ -78,6 +78,33 @@ const STATE = {
 let map;
 let pin;
 let guessPos = null;
+
+/* ================= IMAGE ================= */
+function loadImage(){
+  const url =
+    "https://en.wikipedia.org/w/api.php?" +
+    "action=query&format=json&origin=*" +
+    "&prop=pageimages&piprop=thumbnail&pithumbsize=1200" +
+    "&redirects=1" +
+    "&titles=" + encodeURIComponent(STATE.wiki);
+
+  fetch(url)
+    .then(r => r.json())
+    .then(data => {
+      const page = Object.values(data.query.pages)[0];
+
+      if(page.thumbnail){
+        document.getElementById("photo").style.backgroundImage =
+          `url(${page.thumbnail.source})`;
+      } else {
+        document.getElementById("photo").style.background =
+          "#222";
+      }
+    })
+    .catch(() => {
+      document.getElementById("photo").style.background = "#222";
+    });
+}
 
 /* ================= MAP ================= */
 function initMap(){
@@ -108,35 +135,9 @@ function initMap(){
     }).addTo(map);
   });
 
-  // stable render fix
-  setTimeout(()=>{
+  setTimeout(() => {
     map.invalidateSize();
-  },200);
-}
-
-/* ================= IMAGE ================= */
-function loadImage(){
-  const url =
-    "https://en.wikipedia.org/w/api.php?" +
-    "action=query&format=json&origin=*" +
-    "&prop=pageimages&piprop=thumbnail&pithumbsize=1200" +
-    "&redirects=1" +
-    "&titles=" + encodeURIComponent(STATE.wiki);
-
-  fetch(url)
-    .then(r=>r.json())
-    .then(data=>{
-      const page = Object.values(data.query.pages)[0];
-
-      if(page.thumbnail){
-        document.getElementById('photo').src = page.thumbnail.source;
-      } else {
-        document.getElementById('photo').style.background = "#222";
-      }
-    })
-    .catch(()=>{
-      document.getElementById('photo').style.background = "#222";
-    });
+  }, 200);
 }
 
 /* ================= GUESS ================= */
@@ -155,25 +156,27 @@ function guess(){
 
 /* ================= DIST ================= */
 function haversine(a,b,c,d){
-  const R=6371,toRad=x=>x*Math.PI/180;
-  const dLat=toRad(c-a), dLng=toRad(d-b);
+  const R = 6371;
+  const toRad = x => x * Math.PI / 180;
+
+  const dLat = toRad(c - a);
+  const dLng = toRad(d - b);
 
   const s =
-    Math.sin(dLat/2)**2 +
-    Math.cos(toRad(a))*Math.cos(toRad(c))*Math.sin(dLng/2)**2;
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(a)) * Math.cos(toRad(c)) *
+    Math.sin(dLng / 2) ** 2;
 
-  return R * 2 * Math.atan2(Math.sqrt(s), Math.sqrt(1-s));
+  return R * 2 * Math.atan2(Math.sqrt(s), Math.sqrt(1 - s));
 }
 
-/* ================= START (FIXED TIMING) ================= */
-window.addEventListener("load", () => {
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => {
-      loadImage();
-      initMap();
-    });
-  });
-});
+/* ================= START ================= */
+function start(){
+  loadImage();
+  initMap();
+}
+
+window.addEventListener("load", start);
 
 </script>
 

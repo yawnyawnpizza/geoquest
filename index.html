@@ -20,37 +20,13 @@ html,body{
   font-family:monospace;
 }
 
-/* ================= TERMINAL ================= */
-#menu{
-  position:fixed;
-  inset:0;
-  background:black;
-  color:#00ff88;
-  padding:20px;
-  z-index:20000;
-  white-space:pre-wrap;
-}
-
-.cursor{
-  display:inline-block;
-  width:10px;
-  background:#00ff88;
-  animation:blink 1s infinite;
-}
-
-@keyframes blink{
-  50%{opacity:0;}
-}
-
-/* ================= VIEW ================= */
+/* VIEW */
 #viewer{
   width:100%;
   height:100%;
-  filter:blur(10px);
-  transition:filter 0.6s ease;
 }
 
-/* ================= HUD ================= */
+/* HUD */
 #hud{
   position:fixed;
   top:10px;
@@ -63,7 +39,7 @@ html,body{
   border-radius:8px;
 }
 
-/* ================= MAP ================= */
+/* MAP */
 #mapPanel{
   position:fixed;
   bottom:0;
@@ -76,16 +52,11 @@ html,body{
   z-index:5000;
 }
 
-#mapPanel.open{
-  transform:translateY(0);
-}
+#mapPanel.open{ transform:translateY(0); }
 
-#map{
-  width:100%;
-  height:100%;
-}
+#map{ width:100%; height:100%; }
 
-/* ================= BUTTONS ================= */
+/* BUTTONS */
 button{
   border:none;
   padding:10px 14px;
@@ -94,7 +65,6 @@ button{
   cursor:pointer;
 }
 
-/* MAP BUTTON */
 #mapBtn{
   position:fixed;
   left:10px;
@@ -103,7 +73,6 @@ button{
   background:#c9a84c;
 }
 
-/* GUESS BUTTON ALWAYS VISIBLE */
 #guessBtn{
   position:fixed;
   right:20px;
@@ -112,20 +81,26 @@ button{
   background:white;
 }
 
-/* NEXT BUTTON */
-#nextBtn{
+#moveUI{
   position:fixed;
-  right:10px;
-  top:10px;
-  z-index:9999;
-  display:none;
+  bottom:80px;
+  left:50%;
+  transform:translateX(-50%);
+  display:flex;
+  gap:10px;
+  z-index:999999;
 }
 
-/* ================= RESULTS SCREEN ================= */
+.moveBtn{
+  background:#222;
+  color:white;
+}
+
+/* RESULTS */
 #results{
   position:fixed;
   inset:0;
-  background:rgba(0,0,0,0.75);
+  background:rgba(0,0,0,0.8);
   display:none;
   align-items:center;
   justify-content:center;
@@ -138,57 +113,33 @@ button{
   padding:25px;
   border-radius:12px;
   text-align:center;
-  width:280px;
-  border:1px solid #333;
-}
-
-#resultsBox h2{
-  margin:0 0 10px 0;
-}
-
-#resultsBox p{
-  margin:6px 0;
-  color:#ccc;
-}
-
-#resNext{
-  margin-top:15px;
-  background:#c9a84c;
 }
 </style>
 </head>
 
 <body>
 
-<!-- ================= TERMINAL ================= -->
-<div id="menu">
-<div id="terminal"></div>
-</div>
-
-<!-- ================= GAME ================= -->
 <div id="viewer"></div>
 
 <div id="hud">
-Round: <span id="round">0</span>/5 |
-Score: <span id="score">0</span> |
-Hint: <span id="hint">---</span>
+Score: <span id="score">0</span>
 </div>
 
 <div id="mapPanel">
   <div id="map"></div>
 </div>
 
+<div id="moveUI"></div>
+
 <button id="mapBtn">Map</button>
 <button id="guessBtn">Guess</button>
-<button id="nextBtn">Next</button>
 
-<!-- RESULTS -->
 <div id="results">
   <div id="resultsBox">
     <h2>Result</h2>
     <p id="resDistance"></p>
     <p id="resPoints"></p>
-    <button id="resNext">Next Round</button>
+    <button onclick="nextRound()">Next</button>
   </div>
 </div>
 
@@ -198,92 +149,79 @@ Hint: <span id="hint">---</span>
 
 import { Viewer } from "https://cdn.jsdelivr.net/npm/@photo-sphere-viewer/core/+esm";
 
-/* ================= LOCATIONS ================= */
+/* ================= NODE MAP (STREET VIEW SYSTEM) ================= */
 
-const LOCATIONS = [
-  {name:"NYC",lat:40.7128,lng:-74.0060,pano:"https://photo-sphere-viewer-data.netlify.app/assets/sphere.jpg",hint:"North America"},
-  {name:"Paris",lat:48.8566,lng:2.3522,pano:"https://photo-sphere-viewer-data.netlify.app/assets/sphere-test.jpg",hint:"Europe"},
-  {name:"Tokyo",lat:35.6762,lng:139.6503,pano:"https://photo-sphere-viewer-data.netlify.app/assets/sphere-small.jpg",hint:"Asia"}
-];
+const NODES = {
+  nyc: {
+    lat:40.7128,
+    lng:-74.0060,
+    pano:"https://photo-sphere-viewer-data.netlify.app/assets/sphere.jpg",
+    links:["cn_tower"]
+  },
 
-let viewer,map,pin;
-let current,guessPos;
+  cn_tower: {
+    lat:43.6426,
+    lng:-79.3871,
+    pano:"https://photo-sphere-viewer-data.netlify.app/assets/sphere-test.jpg",
+    links:["nyc","tokyo"]
+  },
 
-let round=0,score=0;
+  tokyo: {
+    lat:35.6762,
+    lng:139.6503,
+    pano:"https://photo-sphere-viewer-data.netlify.app/assets/sphere-small.jpg",
+    links:["cn_tower"]
+  }
+};
 
-/* ================= TERMINAL ================= */
+let currentNode = "nyc";
+let viewer,map,pin,guessPos;
 
-let lines=[];
-let input="";
-const terminal=document.getElementById("terminal");
+let score=0;
 
-function boot(){
-  lines.push("GeoQuest booting...");
-  lines.push("systems online...");
-  lines.push("type start()");
-  render();
+/* ================= LOAD NODE ================= */
+
+function loadNode(id){
+
+  currentNode = id;
+  const node = NODES[id];
+
+  document.getElementById("viewer").innerHTML="";
+
+  viewer = new Viewer({
+    container:document.getElementById("viewer"),
+    panorama:node.pano
+  });
+
+  renderMoves();
 }
 
-function render(){
-  terminal.innerHTML =
-    lines.join("\n") +
-    "\n\n> " + input +
-    "<span class='cursor'></span>";
-}
+/* ================= MOVEMENT ================= */
 
-/* ================= INPUT ================= */
+function renderMoves(){
 
-document.addEventListener("keydown",(e)=>{
+  const ui = document.getElementById("moveUI");
+  ui.innerHTML = "";
 
-  if(document.getElementById("menu").style.display==="none") return;
+  NODES[currentNode].links.forEach(link=>{
 
-  if(e.key==="Backspace"){
-    input=input.slice(0,-1);
-  }
-  else if(e.key==="Enter"){
-    lines.push("> " + input);
-    execute(input);
-    input="";
-  }
-  else if(e.key.length===1){
-    input+=e.key;
-  }
+    const b = document.createElement("button");
+    b.className="moveBtn";
+    b.innerText="Move";
 
-  render();
-});
+    b.onclick=()=>loadNode(link);
 
-/* ================= COMMAND ================= */
-
-function execute(cmd){
-
-  cmd=cmd.trim().toLowerCase();
-
-  if(cmd==="start()"||cmd==="start"){
-    document.getElementById("menu").style.display="none";
-
-    setTimeout(()=>{
-      initMap();
-      nextRound();
-    },200);
-
-    return;
-  }
-
-  lines.push("unknown command");
-  render();
+    ui.appendChild(b);
+  });
 }
 
 /* ================= MAP ================= */
 
 function initMap(){
 
-  map=L.map("map",{attributionControl:false});
+  map=L.map("map").setView([20,0],2);
 
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{
-    maxZoom:19
-  }).addTo(map);
-
-  map.setView([20,0],2);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
 
   map.on("click",e=>{
     guessPos=e.latlng;
@@ -297,118 +235,66 @@ function initMap(){
       fillOpacity:1
     }).addTo(map);
   });
-
-  setTimeout(()=>map.invalidateSize(true),300);
-}
-
-/* ================= PANORAMA ================= */
-
-function loadPanorama(img){
-
-  document.getElementById("viewer").innerHTML="";
-
-  viewer=new Viewer({
-    container:document.getElementById("viewer"),
-    panorama:img
-  });
-
-  document.getElementById("viewer").style.filter="blur(0px)";
-}
-
-/* ================= ROUND ================= */
-
-function nextRound(){
-
-  round++;
-  if(round>5){
-    alert("Final Score: "+score);
-    return;
-  }
-
-  document.getElementById("round").innerText=round;
-
-  current=LOCATIONS[Math.floor(Math.random()*LOCATIONS.length)];
-  guessPos=null;
-
-  document.getElementById("hint").innerText=current.hint;
-
-  loadPanorama(current.pano);
 }
 
 /* ================= GUESS ================= */
 
 document.getElementById("guessBtn").onclick=()=>{
 
-  if(!guessPos){
-    alert("Pick a location first");
-    return;
-  }
+  if(!guessPos) return;
 
-  let d=haversine(
-    guessPos.lat,
-    guessPos.lng,
-    current.lat,
-    current.lng
+  const node = NODES[currentNode];
+
+  let d = haversine(
+    guessPos.lat,guessPos.lng,
+    node.lat,node.lng
   );
 
-  let points=Math.max(0,Math.round(5000-d*2));
+  let points = Math.max(0,Math.round(5000-d*2));
 
-  score+=points;
-  document.getElementById("score").innerText=score;
+  score += points;
+  document.getElementById("score").innerText = score;
 
-  showResults(d,points);
-};
+  document.getElementById("resDistance").innerText =
+    "You were " + Math.round(d) + " km away";
 
-/* ================= RESULTS ================= */
-
-function showResults(distance,points){
-
-  document.getElementById("resDistance").innerText=
-    "You were " + Math.round(distance) + " km away";
-
-  document.getElementById("resPoints").innerText=
-    "You earned " + points + " points";
+  document.getElementById("resPoints").innerText =
+    "Points: " + points;
 
   document.getElementById("results").style.display="flex";
-}
-
-/* ================= NEXT ROUND ================= */
-
-document.getElementById("resNext").onclick=()=>{
-
-  document.getElementById("results").style.display="none";
-
-  nextRound();
 };
 
-/* ================= MAP TOGGLE ================= */
+/* ================= NEXT ================= */
+
+window.nextRound = function(){
+  document.getElementById("results").style.display="none";
+  loadNode("nyc");
+};
+
+/* ================= MAP BUTTON ================= */
 
 document.getElementById("mapBtn").onclick=()=>{
   document.getElementById("mapPanel").classList.toggle("open");
-  setTimeout(()=>map.invalidateSize(true),300);
+  setTimeout(()=>map.invalidateSize(),300);
 };
 
 /* ================= DIST ================= */
 
 function haversine(a,b,c,d){
   const R=6371,toRad=x=>x*Math.PI/180;
-
   const dLat=toRad(c-a);
   const dLng=toRad(d-b);
-
-  const s=
-    Math.sin(dLat/2)**2 +
+  const s=Math.sin(dLat/2)**2+
     Math.cos(toRad(a))*Math.cos(toRad(c))*
     Math.sin(dLng/2)**2;
-
   return R*2*Math.atan2(Math.sqrt(s),Math.sqrt(1-s));
 }
 
 /* ================= START ================= */
 
-window.addEventListener("load",boot);
+loadNode("nyc");
+initMap();
 
 </script>
-
 </body>
 </html>

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>GeoQuest OS</title>
+<title>GeoQuest</title>
 
 <link rel="stylesheet"
 href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css"/>
@@ -28,6 +28,7 @@ html,body{
   color:#00ff88;
   padding:20px;
   z-index:20000;
+  white-space:pre-wrap;
 }
 
 .cursor{
@@ -41,15 +42,14 @@ html,body{
   50%{opacity:0;}
 }
 
-/* ================= VIEW ================= */
+/* ================= GAME ================= */
 #viewer{
   width:100%;
   height:100%;
   filter:blur(10px);
-  transition:filter 1s ease;
+  transition:filter 0.8s ease;
 }
 
-/* ================= HUD ================= */
 #hud{
   position:fixed;
   top:10px;
@@ -110,20 +110,6 @@ button{
   z-index:9999;
   display:none;
 }
-
-/* ================= DEV ================= */
-#dev{
-  position:fixed;
-  bottom:60px;
-  left:10px;
-  width:260px;
-  background:rgba(0,0,0,0.8);
-  color:#0f0;
-  font-size:12px;
-  padding:10px;
-  display:none;
-  z-index:15000;
-}
 </style>
 </head>
 
@@ -151,8 +137,6 @@ Hint: <span id="hint">---</span>
 <button id="mapBtn">Map</button>
 <button id="nextBtn">Next</button>
 
-<div id="dev"></div>
-
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
 
 <script type="module">
@@ -171,67 +155,78 @@ let viewer,map,pin;
 let current,guessPos;
 
 let round=0,score=0;
-let settings={timeLimit:5,difficulty:2,admin:false};
 
-/* ================= TERMINAL ================= */
+let settings={
+  timeLimit:5,
+  difficulty:2,
+  admin:false
+};
+
+/* ================= TERMINAL STATE ================= */
+
+let lines=[];
+let input="";
 
 const terminal=document.getElementById("terminal");
-let text="",input="";
 
-const lines=[
-"GeoQuest OS booting...",
-"loading world engine... OK",
-"",
-"timeLimit = <min>",
-"difficulty = <1-3>",
-"start()",
-"cheats()",
-"admin()",
-"help",
-""
-];
-
-let i=0;
+/* ================= BOOT ================= */
 
 function boot(){
-  if(i<lines.length){
-    text+=lines[i]+"\n";
-    terminal.innerHTML=text+"<span class='cursor'></span>";
-    i++;
-    setTimeout(boot,250);
-  } else {
-    terminal.innerHTML=text+"> <span id='input'></span><span class='cursor'></span>";
-  }
+
+  lines.push("GeoQuest OS booting...");
+  lines.push("loading world engine... OK");
+  lines.push("");
+  lines.push("type: help");
+  lines.push("start() to begin");
+  lines.push("");
+
+  render();
+}
+
+/* ================= RENDER ================= */
+
+function render(){
+
+  terminal.innerHTML =
+    lines.join("\n") +
+    "\n\n> " + input +
+    "<span class='cursor'></span>";
 }
 
 /* ================= INPUT ================= */
 
 document.addEventListener("keydown",(e)=>{
 
-  if(i<lines.length) return;
+  if(document.getElementById("menu").style.display==="none") return;
 
-  const inputEl=document.getElementById("input");
-  if(!inputEl) return;
+  if(e.key==="Backspace"){
+    input=input.slice(0,-1);
+  }
 
-  if(e.key==="Backspace") input=input.slice(0,-1);
-  else if(e.key==="Enter"){ execute(input); input=""; }
-  else if(e.key.length===1) input+=e.key;
+  else if(e.key==="Enter"){
+    lines.push("> " + input);
+    execute(input);
+    input="";
+  }
 
-  inputEl.innerText=input;
+  else if(e.key.length===1){
+    input+=e.key;
+  }
+
+  render();
 });
 
 /* ================= COMMAND ENGINE ================= */
 
 function log(msg){
-  text+="> "+msg+"\n";
-  terminal.innerHTML=text+"> "+input+"<span class='cursor'></span>";
+  lines.push(msg);
+  render();
 }
 
 function execute(cmd){
 
   cmd=cmd.trim().replace(/\s*=\s*/g,"=");
 
-  /* ================= HELP ================= */
   if(cmd==="help"){
     log("timeLimit = x");
     log("difficulty = x");
@@ -241,7 +236,6 @@ function execute(cmd){
     return;
   }
 
-  /* ================= CHEATS ================= */
   if(cmd==="cheats()"){
     log("godmode");
     log("reveal()");
@@ -250,27 +244,24 @@ function execute(cmd){
     return;
   }
 
-  /* ================= ADMIN MODE ================= */
   if(cmd==="admin()"){
     settings.admin=true;
     log("ADMIN MODE ENABLED");
-    log("unlocked hidden commands");
     return;
   }
 
   if(cmd==="godmode" && settings.admin){
-    settings.godmode=true;
     log("godmode ON");
     return;
   }
 
   if(cmd==="reveal()" && settings.admin){
-    log("map hints always ON");
+    log("hints always on");
     return;
   }
 
   if(cmd==="skip()" && settings.admin){
-    log("skipping round");
+    log("round skipped");
     nextRound();
     return;
   }
@@ -282,19 +273,15 @@ function execute(cmd){
     return;
   }
 
-  /* ================= VARIABLES ================= */
   if(cmd.includes("=")){
     let [k,v]=cmd.split("=");
     v=eval(v);
 
-    if(k==="timeLimit") settings.timeLimit=v;
-    if(k==="difficulty") settings.difficulty=v;
-
+    settings[k]=v;
     log(k+" = "+v);
     return;
   }
 
-  /* ================= START ================= */
   if(cmd==="start()"||cmd==="start"){
     document.getElementById("menu").style.display="none";
     initMap();
@@ -309,21 +296,34 @@ function execute(cmd){
 
 function loadPanorama(img){
   document.getElementById("viewer").innerHTML="";
-  viewer=new Viewer({container:viewer=document.getElementById("viewer"),panorama:img});
+  viewer=new Viewer({
+    container:document.getElementById("viewer"),
+    panorama:img
+  });
   document.getElementById("viewer").style.filter="blur(0px)";
 }
 
 /* ================= MAP ================= */
 
 function initMap(){
+
   map=L.map("map",{attributionControl:false});
+
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19}).addTo(map);
+
   map.setView([20,0],2);
 
   map.on("click",e=>{
     guessPos=e.latlng;
+
     if(pin)pin.remove();
-    pin=L.circleMarker(guessPos,{radius:8,color:"#fff",fillColor:"#c9a84c",fillOpacity:1}).addTo(map);
+
+    pin=L.circleMarker(guessPos,{
+      radius:8,
+      color:"#fff",
+      fillColor:"#c9a84c",
+      fillOpacity:1
+    }).addTo(map);
   });
 }
 
@@ -331,22 +331,18 @@ function initMap(){
 
 function nextRound(){
 
-  if(round>=5){
+  round++;
+  if(round>5){
     alert("Final Score: "+score);
     return;
   }
 
-  round++;
   document.getElementById("round").innerText=round;
 
   current=LOCATIONS[Math.floor(Math.random()*LOCATIONS.length)];
   guessPos=null;
 
-  document.getElementById("hint").innerText="...";
-
-  setTimeout(()=>{
-    document.getElementById("hint").innerText=current.hint;
-  },5000);
+  document.getElementById("hint").innerText=current.hint;
 
   loadPanorama(current.pano);
 }

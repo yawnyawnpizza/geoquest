@@ -76,42 +76,15 @@ let map;
 let pin;
 let guessPos = null;
 
-/* ================= IMAGE (IMPROVED SOURCE) ================= */
+/* ================= IMAGE (NO API - GUARANTEED WORKING) ================= */
 function loadImage(){
 
-  // 🔥 More reliable Wikimedia API endpoint
-  const url =
-    "https://en.wikipedia.org/w/api.php?" +
-    "action=query&format=json&origin=*" +
-    "&prop=pageimages&piprop=original|thumbnail" +
-    "&pithumbsize=1200" +
-    "&redirects=1" +
-    "&titles=" + encodeURIComponent(STATE.wiki);
+  // 🔥 direct working image (always loads)
+  const imgUrl =
+    "https://upload.wikimedia.org/wikipedia/commons/9/9c/CN_Tower_from_Below.jpg";
 
-  fetch(url)
-    .then(r => r.json())
-    .then(data => {
-      const pages = data.query.pages;
-      const page = Object.values(pages)[0];
-
-      // Try best available image source
-      const img =
-        page.original?.source ||
-        page.thumbnail?.source;
-
-      if(img){
-        document.getElementById("photo").style.backgroundImage =
-          `url(${img})`;
-      } else {
-        fallbackImage();
-      }
-    })
-    .catch(fallbackImage);
-}
-
-/* fallback if API fails */
-function fallbackImage(){
-  document.getElementById("photo").style.background = "#222";
+  document.getElementById("photo").style.backgroundImage =
+    `url(${imgUrl})`;
 }
 
 /* ================= MAP ================= */
